@@ -1,9 +1,7 @@
 <div align="center">
 
-<img src="public/walrus-logo.png" alt="Walrus Logo" width="100" />
-
 # 🦭 Walrus
-### *Your AI-Powered CBSE Study Companion*
+### *Your AI-Powered Study Companion*
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
@@ -238,7 +236,7 @@ This project is licensed under the **MIT License**.
 
 <div align="center">
 
-Made with ❤️ for CBSE students everywhere
+Made with ❤️ for students everywhere
 
 **[⬆ Back to top](#-walrus)**
 
