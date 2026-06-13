@@ -137,19 +137,7 @@ export default function Tutorial({ setActiveTab, user }) {
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '3rem' }}>
       {/* Header Banner */}
-      <div className="card" style={{ 
-        background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--primary-light) 100%)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '2.5rem',
-        marginBottom: '2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        boxShadow: 'var(--shadow-md)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
+      <div className="card tutorial-banner" style={{ borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }}>
         <div style={{ position: 'absolute', right: '-20px', bottom: '-20px', opacity: 0.05, transform: 'rotate(-15deg)' }}>
           <Sparkles size={240} style={{ color: 'var(--primary)' }} />
         </div>
@@ -165,7 +153,7 @@ export default function Tutorial({ setActiveTab, user }) {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+      <div className="tutorial-grid">
         {/* Left Side: interactive checklist */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
           <div>
