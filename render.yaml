@@ -30,8 +30,9 @@ services:
         sync: false
 
   # ── 2. FRONTEND (React / Vite — Static Site) ────────────────────────────────
-  - type: static
+  - type: web
     name: walrus-frontend
+    runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
