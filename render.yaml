@@ -1,0 +1,46 @@
+# render.yaml — Walrus Blueprint
+# Render reads this file and auto-creates both services.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── 1. BACKEND (Node.js / Express) ─────────────────────────────────────────
+  - type: web
+    name: walrus-backend
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false          # You will paste this in the Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: FRONTEND_URL
+        # Set this to your Render frontend URL after first deploy
+        # e.g. https://walrus-frontend.onrender.com
+        sync: false
+
+  # ── 2. FRONTEND (React / Vite — Static Site) ────────────────────────────────
+  - type: web
+    name: walrus-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    plan: free
+    envVars:
+      - key: VITE_API_URL
+        # Replace with your actual backend Render URL after first deploy
+        # e.g.  https://walrus-backend.onrender.com/api
+        sync: false
+    routes:
+      # SPA fallback — send all routes to index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
