@@ -31,15 +31,28 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
   process.env.FRONTEND_URL, // e.g. https://walrus-frontend.onrender.com
-].filter(Boolean);
+].filter(Boolean).map(url => url.trim().replace(/\/$/, ''));
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (curl, mobile apps, Render health checks)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    
+    const normalizedOrigin = origin.trim().replace(/\/$/, '');
+    
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+    
+    // Fallback: allow any Render subdomain for walrus-frontend to prevent bricking the deployed app
+    if (normalizedOrigin.startsWith('https://walrus-frontend') && normalizedOrigin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    
     // In development, allow everything
     if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    
+    console.error(`CORS Blocked: Origin ${origin} not in allowedOrigins:`, allowedOrigins);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
