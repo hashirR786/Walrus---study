@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { BookOpen, FileText, Download, Sparkles, RefreshCw } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
+import { API_BASE } from '../config';
+
 const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics'];
 
 const CHAPTERS_PRESET = {
@@ -25,7 +27,7 @@ export default function Resources({ onActivityTriggered }) {
     if (!chapter) return;
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/ai/generate-notes', {
+      const res = await fetch(`${API_BASE}/ai/generate-notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, chapter })

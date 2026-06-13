@@ -378,7 +378,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
 
         {/* Header */}
         <header style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: '0.75rem', flexShrink: 0, zIndex: 5 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="doubt-solver-header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.2rem' }}>
               <GraduationCap size={24} /> AI CBSE Tutor &amp; Doubt Solver
             </h2>
@@ -399,7 +399,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          <div className="doubt-solver-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Subject</label>
               <select className="input-control" style={{ padding: '0.45rem 0.7rem', fontSize: '0.88rem', height: '2.1rem', backgroundColor: 'var(--bg-app)' }}

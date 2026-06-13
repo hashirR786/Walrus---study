@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap, Timer, Award, Layers, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Zap, RotateCcw, Sparkles, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
+import { API_BASE } from '../config';
 
 const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics'];
 
@@ -141,7 +142,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     setErrorAnalysis(null);
     setStudentAnswers({});
     try {
-      const res = await fetch('http://localhost:5000/api/ai/generate-test', {
+      const res = await fetch(`${API_BASE}/ai/generate-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, chapter, duration: testDuration })
@@ -163,7 +164,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     setTestActive(false);
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/ai/evaluate-test', {
+      const res = await fetch(`${API_BASE}/ai/evaluate-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: currentPaper.subject, generatedPaper: currentPaper, answers: studentAnswers })
@@ -190,7 +191,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     setIsAnalyzingErrors(true);
     setErrorAnalysis(null);
     try {
-      const res = await fetch('http://localhost:5000/api/ai/analyze-errors', {
+      const res = await fetch(`${API_BASE}/ai/analyze-errors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +224,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     setQpAnswers({});
     setQpRevealed({});
     try {
-      const res = await fetch('http://localhost:5000/api/ai/quick-practice', {
+      const res = await fetch(`${API_BASE}/ai/quick-practice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -249,7 +250,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
 
   const fetchFlashcards = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/student/flashcards?userId=${userId}`);
+      const res = await fetch(`${API_BASE}/student/flashcards?userId=${userId}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       if (data && data.length > 0) {
@@ -367,7 +368,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
 
     if (!isLocalOnly) {
       try {
-        const res = await fetch('http://localhost:5000/api/student/flashcards/review', {
+        const res = await fetch(`${API_BASE}/student/flashcards/review`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardId, passed })
@@ -403,7 +404,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     const isLocalOnly = cardId.startsWith('seed-') || cardId.startsWith('offline-') || cardId.startsWith('mock-ai-');
     if (!isLocalOnly) {
       try {
-        const res = await fetch(`http://localhost:5000/api/student/flashcards/${cardId}`, {
+        const res = await fetch(`${API_BASE}/student/flashcards/${cardId}`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed to delete card');
@@ -429,7 +430,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/student/flashcards', {
+      const res = await fetch(`${API_BASE}/student/flashcards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCardPayload)
@@ -459,7 +460,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     const activeCh = fcChapter === 'All Chapters' ? chaptersForSubject[0] || 'General' : fcChapter;
     setIsGeneratingCards(true);
     try {
-      const res = await fetch('http://localhost:5000/api/ai/generate-flashcards', {
+      const res = await fetch(`${API_BASE}/ai/generate-flashcards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

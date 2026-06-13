@@ -11,6 +11,7 @@ import Community from './components/Community';
 import Auth from './components/Auth';
 import ProfileView from './components/ProfileView';
 import Tutorial from './components/Tutorial';
+import { API_BASE } from './config';
 
 
 const OFFLINE_SYLLABUS = [
@@ -129,7 +130,7 @@ export default function App() {
     setIsLoading(true);
     const userId = user?._id || 'default-student';
     try {
-      const res = await fetch(`http://localhost:5000/api/student/progress?userId=${userId}`, {
+      const res = await fetch(`${API_BASE}/student/progress?userId=${userId}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (!res.ok) throw new Error('Failed to load profile');
@@ -197,7 +198,7 @@ export default function App() {
 
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/student/progress/chapter', {
+      const res = await fetch(`${API_BASE}/student/progress/chapter`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -226,7 +227,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/student/progress/goal', {
+      const res = await fetch(`${API_BASE}/student/progress/goal`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -258,7 +259,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/student/progress/study-time', {
+      const res = await fetch(`${API_BASE}/student/progress/study-time`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -294,7 +295,7 @@ export default function App() {
     }
 
     try {
-      await fetch('http://localhost:5000/api/student/tests', {
+      await fetch(`${API_BASE}/student/tests`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
