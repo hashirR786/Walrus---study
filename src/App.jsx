@@ -371,7 +371,7 @@ export default function App() {
         )}
 
         {activeTab === 'tutorial' && (
-          <Tutorial setActiveTab={setActiveTab} />
+          <Tutorial setActiveTab={setActiveTab} user={user} />
         )}
 
         {activeTab === 'doubt-solver' && (

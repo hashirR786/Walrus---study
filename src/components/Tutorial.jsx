@@ -17,7 +17,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 
-export default function Tutorial({ setActiveTab }) {
+export default function Tutorial({ setActiveTab, user }) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [completedSteps, setCompletedSteps] = useState(() => {
     try {
@@ -155,7 +155,7 @@ export default function Tutorial({ setActiveTab }) {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: '600', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          <Sparkles size={16} /> Welcome to Walrus
+          <Sparkles size={16} /> Welcome to Walrus{user?.username ? `, ${user.username}` : ''}!
         </div>
         <h1 style={{ fontSize: '2.2rem', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', marginTop: '0.25rem' }}>
           Your Quick Start Study Guide
