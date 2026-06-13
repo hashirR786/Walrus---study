@@ -30,12 +30,10 @@ services:
         sync: false
 
   # ── 2. FRONTEND (React / Vite — Static Site) ────────────────────────────────
-  - type: web
+  - type: static
     name: walrus-frontend
-    runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
-    plan: free
     envVars:
       - key: VITE_API_URL
         # Replace with your actual backend Render URL after first deploy
