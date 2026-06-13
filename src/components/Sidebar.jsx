@@ -10,7 +10,8 @@ import {
   Moon, 
   GraduationCap,
   LogOut,
-  X
+  X,
+  HelpCircle
 } from 'lucide-react';
 
 
@@ -37,6 +38,7 @@ export default function Sidebar({
   onClose
 }) {
   const menuItems = [
+    { id: 'tutorial', label: 'Quick Start Tour', icon: HelpCircle },
     { id: 'doubt-solver', label: 'AI Doubt Solver', icon: MessageSquare },
     { id: 'syllabus-tracker', label: 'Syllabus Tracker', icon: CheckSquare },
     { id: 'practice-engine', label: 'Practice Engine', icon: GraduationCap },

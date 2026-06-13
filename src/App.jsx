@@ -10,6 +10,7 @@ import Resources from './components/Resources';
 import Community from './components/Community';
 import Auth from './components/Auth';
 import ProfileView from './components/ProfileView';
+import Tutorial from './components/Tutorial';
 
 
 const OFFLINE_SYLLABUS = [
@@ -88,7 +89,7 @@ export default function App() {
   });
   const [toasts, setToasts] = useState([]);
 
-  const [activeTab, setActiveTab] = useState('doubt-solver');
+  const [activeTab, setActiveTab] = useState('tutorial');
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [accent, setAccent] = useState(localStorage.getItem('accent') || 'classic-slate');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -367,6 +368,10 @@ export default function App() {
           <div className="badge badge-danger" style={{ marginBottom: '1.5rem', width: '100%', justifyContent: 'center', padding: '0.6rem' }}>
             <span>⚠️ Standalone Offline Mode: Express Server is offline. Running with cached LocalStorage state.</span>
           </div>
+        )}
+
+        {activeTab === 'tutorial' && (
+          <Tutorial setActiveTab={setActiveTab} />
         )}
 
         {activeTab === 'doubt-solver' && (
