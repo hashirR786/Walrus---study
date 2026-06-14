@@ -371,6 +371,8 @@ export default function App() {
           </div>
         )}
 
+        <div key={activeTab} className="page-transition">
+
         {activeTab === 'tutorial' && (
           <Tutorial setActiveTab={setActiveTab} user={user} />
         )}
@@ -423,6 +425,7 @@ export default function App() {
         {activeTab === 'community' && (
           <Community progressData={progressData} user={user} />
         )}
+        </div>
       </main>
 
       {/* Floating Toasts */}

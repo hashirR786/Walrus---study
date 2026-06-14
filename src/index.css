@@ -1354,3 +1354,32 @@ button.btn-secondary:hover {
   }
 }
 
+/* Page Transition Animation */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: pageEnter 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  width: 100%;
+}
+
+.main-content.chat-mode > .page-transition {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+
+
