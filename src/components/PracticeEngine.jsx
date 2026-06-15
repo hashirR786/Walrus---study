@@ -360,6 +360,8 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   const handleSubmitTest = async () => {
     if (!currentPaper) return;
     setTestActive(false);
+    setViolations(0);
+    setViolationWarning(null);
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/ai/evaluate-test`, {
@@ -1102,7 +1104,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button className="btn-secondary" onClick={() => { setTestActive(false); setCurrentPaper(null); }}>Quit Test</button>
+                <button className="btn-secondary" onClick={() => { setTestActive(false); setCurrentPaper(null); setViolations(0); setViolationWarning(null); }}>Quit Test</button>
                 <button className="btn-primary" onClick={handleSubmitTest} disabled={isLoading}>
                   {isLoading ? 'Grading…' : 'Submit Paper for Assessment'}
                 </button>

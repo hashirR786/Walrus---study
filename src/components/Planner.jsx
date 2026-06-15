@@ -12,9 +12,43 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
   
   // AI Schedule states
   const [isLoading, setIsLoading] = useState(false);
-  const [schedule, setSchedule] = useState('');
-  const [examDate, setExamDate] = useState('2026-03-01');
-  const [targetScore, setTargetScore] = useState('95%');
+  const [schedule, setSchedule] = useState(() => {
+    try {
+      const cached = localStorage.getItem('walrus_study_schedule');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const today = new Date().toISOString().split('T')[0];
+        if (parsed.examDate && parsed.examDate >= today) {
+          return parsed.schedule || '';
+        }
+      }
+    } catch {}
+    return '';
+  });
+
+  const [examDate, setExamDate] = useState(() => {
+    try {
+      const cached = localStorage.getItem('walrus_study_schedule');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.examDate || '2026-03-01';
+      }
+    } catch {}
+    return '2026-03-01';
+  });
+
+  const [targetScore, setTargetScore] = useState(() => {
+    try {
+      const cached = localStorage.getItem('walrus_study_schedule');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.targetScore || '95%';
+      }
+    } catch {}
+    return '95%';
+  });
+
+  const [showGenerateForm, setShowGenerateForm] = useState(!schedule);
 
   // Pomodoro logic
   useEffect(() => {
@@ -102,6 +136,14 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
       });
       const data = await res.json();
       setSchedule(data.schedule);
+      
+      // Cache the schedule details
+      localStorage.setItem('walrus_study_schedule', JSON.stringify({
+        schedule: data.schedule,
+        examDate,
+        targetScore
+      }));
+      setShowGenerateForm(false);
     } catch (err) {
       console.error(err);
       alert('Failed to generate study schedule.');
@@ -109,6 +151,16 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
       setIsLoading(false);
     }
   };
+
+  // Expiration check effect
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (examDate && examDate < today && schedule) {
+      setSchedule('');
+      localStorage.removeItem('walrus_study_schedule');
+      setShowGenerateForm(true);
+    }
+  }, [examDate, schedule]);
 
   return (
     <div className="glass-panel" style={{ maxWidth: '950px', margin: '0 auto' }}>
@@ -199,36 +251,64 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
             Get a weekly calendar study schedule automatically generated based on the exam dates and completed chapters.
           </p>
 
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label>Target Exam Date</label>
-              <input 
-                type="date" 
-                className="input-control" 
-                value={examDate} 
-                onChange={(e) => setExamDate(e.target.value)} 
-              />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label>Target Percentage</label>
-              <input 
-                type="text" 
-                className="input-control" 
-                value={targetScore} 
-                onChange={(e) => setTargetScore(e.target.value)} 
-              />
-            </div>
-          </div>
+          {showGenerateForm ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '150px' }}>
+                  <label>Target Exam Date</label>
+                  <input 
+                    type="date" 
+                    className="input-control" 
+                    value={examDate} 
+                    onChange={(e) => setExamDate(e.target.value)} 
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '150px' }}>
+                  <label>Target Percentage</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    value={targetScore} 
+                    onChange={(e) => setTargetScore(e.target.value)} 
+                  />
+                </div>
+              </div>
 
-          <button className="btn-primary" style={{ alignSelf: 'flex-start', marginBottom: '1.5rem' }} onClick={handleGenerateSchedule} disabled={isLoading}>
-            {isLoading ? <RefreshCw className="animate-spin" size={16} /> : 'Generate Custom Study Schedule'}
-          </button>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button className="btn-primary" onClick={handleGenerateSchedule} disabled={isLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {isLoading ? <><RefreshCw className="animate-spin" size={16} /> Generating schedule…</> : 'Generate Study Schedule'}
+                </button>
+                {schedule && (
+                  <button className="btn-secondary" onClick={() => setShowGenerateForm(false)} disabled={isLoading}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--primary-light)', padding: '0.6rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                  📅 <strong>Active Schedule Target:</strong> {examDate} &nbsp;·&nbsp; 🎯 <strong>Goal:</strong> {targetScore}
+                </div>
+                <button 
+                  className="btn-secondary" 
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                  onClick={() => setShowGenerateForm(true)}
+                >
+                  Generate New Schedule
+                </button>
+              </div>
+            </div>
+          )}
 
-          <div className="markdown-body" style={{ flex: 1, backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', maxHeight: '380px', overflowY: 'auto' }}>
+          <div className="markdown-body" style={{ flex: 1, backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', maxHeight: '420px', overflowY: 'auto' }}>
             {schedule ? (
               <MarkdownRenderer content={schedule} />
             ) : (
-              <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No calendar generated yet. Input target settings and click Generate above!</p>
+              <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', marginTop: '2rem' }}>
+                No calendar generated yet. Configure target settings and click Generate above!
+              </p>
             )}
           </div>
         </div>
