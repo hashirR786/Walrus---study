@@ -371,60 +371,63 @@ export default function App() {
           </div>
         )}
 
-        <div key={activeTab} className="page-transition">
+        <div className="page-transition" style={{ height: activeTab === 'doubt-solver' ? '100%' : 'auto', display: 'flex', flexDirection: 'column' }}>
 
-        {activeTab === 'tutorial' && (
-          <Tutorial setActiveTab={setActiveTab} user={user} />
-        )}
+          <div style={{ display: activeTab === 'tutorial' ? 'block' : 'none' }}>
+            <Tutorial setActiveTab={setActiveTab} user={user} />
+          </div>
 
-        {activeTab === 'doubt-solver' && (
-          <DoubtSolver 
-            progressData={progressData} 
-            onActivityTriggered={handleUpdateStudyTime}
-            user={user}
-          />
-        )}
+          <div style={{ display: activeTab === 'doubt-solver' ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0, overflow: 'hidden' }}>
+            <DoubtSolver 
+              progressData={progressData} 
+              onActivityTriggered={handleUpdateStudyTime}
+              user={user}
+              activeTab={activeTab}
+            />
+          </div>
 
-        {activeTab === 'profile' && (
-          <ProfileView
-            token={token}
-            user={user}
-            onUpdateUser={handleUpdateUser}
-            addToast={addToast}
-          />
-        )}
-        
-        {activeTab === 'syllabus-tracker' && (
-          <SyllabusTracker 
-            progressData={progressData} 
-            onUpdateChapter={handleUpdateChapter}
-            isLoading={isLoading}
-          />
-        )}
-        
-        {activeTab === 'practice-engine' && (
-          <PracticeEngine 
-            progressData={progressData} 
-            onSaveTestResult={handleSaveTestResult}
-          />
-        )}
-        
-        {activeTab === 'analytics' && (
-          <Analytics progressData={progressData} />
-        )}
-        
-        {activeTab === 'planner' && (
-          <Planner 
-            progressData={progressData}
-            onToggleGoal={handleToggleGoal}
-            onUpdateStudyTime={handleUpdateStudyTime}
-            onRefreshProfile={fetchProfile}
-          />
-        )}
-        
-        {activeTab === 'community' && (
-          <Community progressData={progressData} user={user} />
-        )}
+          <div style={{ display: activeTab === 'profile' ? 'block' : 'none' }}>
+            <ProfileView
+              token={token}
+              user={user}
+              onUpdateUser={handleUpdateUser}
+              addToast={addToast}
+            />
+          </div>
+          
+          <div style={{ display: activeTab === 'syllabus-tracker' ? 'block' : 'none' }}>
+            <SyllabusTracker 
+              progressData={progressData} 
+              onUpdateChapter={handleUpdateChapter}
+              isLoading={isLoading}
+            />
+          </div>
+          
+          <div style={{ display: activeTab === 'practice-engine' ? 'block' : 'none' }}>
+            <PracticeEngine 
+              progressData={progressData} 
+              onSaveTestResult={handleSaveTestResult}
+              user={user}
+              activeTab={activeTab}
+            />
+          </div>
+          
+          <div style={{ display: activeTab === 'analytics' ? 'block' : 'none' }}>
+            <Analytics progressData={progressData} />
+          </div>
+          
+          <div style={{ display: activeTab === 'planner' ? 'block' : 'none' }}>
+            <Planner 
+              progressData={progressData}
+              onToggleGoal={handleToggleGoal}
+              onUpdateStudyTime={handleUpdateStudyTime}
+              onRefreshProfile={fetchProfile}
+            />
+          </div>
+          
+          <div style={{ display: activeTab === 'community' ? 'block' : 'none' }}>
+            <Community progressData={progressData} user={user} />
+          </div>
         </div>
       </main>
 

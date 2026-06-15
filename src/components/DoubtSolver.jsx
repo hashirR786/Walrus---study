@@ -38,15 +38,25 @@ const INITIAL_MESSAGE = {
   timestamp: new Date().toISOString()
 };
 
-export default function DoubtSolver({ progressData, onActivityTriggered, user }) {
-  const [subject, setSubject] = useState(SUBJECTS_LIST[0]);
-  const [chapter, setChapter] = useState('All Chapters');
-  const [mode, setMode] = useState('Doubt Solver');
+export default function DoubtSolver({ progressData, onActivityTriggered, user, activeTab }) {
+  // Load cached active chat from localStorage if available
+  const [activeChatCache] = useState(() => {
+    try {
+      const cached = localStorage.getItem('walrus_active_chat');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [subject, setSubject] = useState(() => activeChatCache?.subject || SUBJECTS_LIST[0]);
+  const [chapter, setChapter] = useState(() => activeChatCache?.chapter || 'All Chapters');
+  const [mode, setMode] = useState(() => activeChatCache?.mode || 'Doubt Solver');
   const [studentInput, setStudentInput] = useState('');
   const [studentAttempt, setStudentAttempt] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
+  const [messages, setMessages] = useState(() => activeChatCache?.messages || [INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Image & OCR
@@ -60,11 +70,32 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
   const audioChunksRef = useRef([]);
 
   // Session persistence
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  const currentSessionIdRef = useRef(null); // always-fresh ref to avoid stale closures
+  const [currentSessionId, setCurrentSessionId] = useState(() => activeChatCache?.currentSessionId || null);
+  const currentSessionIdRef = useRef(activeChatCache?.currentSessionId || null); // always-fresh ref to avoid stale closures
   const [sessions, setSessions] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Keep ref in sync
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
+
+  // Sync active session changes to localStorage cache
+  useEffect(() => {
+    try {
+      const activeChat = {
+        currentSessionId,
+        messages,
+        subject,
+        chapter,
+        mode
+      };
+      localStorage.setItem('walrus_active_chat', JSON.stringify(activeChat));
+    } catch (err) {
+      console.error('Failed to cache active chat:', err);
+    }
+  }, [currentSessionId, messages, subject, chapter, mode]);
 
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -80,6 +111,12 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
   }, [user?.username]);
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
+
+  useEffect(() => {
+    if (activeTab === 'doubt-solver') {
+      fetchSessions();
+    }
+  }, [activeTab, fetchSessions]);
 
   // ── persistSession: called directly after each AI reply ──────────────────
   const persistSession = async (msgs, sessId, subj, chap, mod) => {
@@ -116,11 +153,17 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
     return null;
   };
 
+  const isInitialRender = useRef(true);
+
   // ── Chapter sync ────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
     const chapters = getChaptersForSubject(subject, progressData);
     setChapter(chapters[0] || 'All Chapters');
-  }, [subject, progressData]);
+  }, [subject]);
 
   // ── Auto-scroll ─────────────────────────────────────────────────────────────
   useEffect(() => {

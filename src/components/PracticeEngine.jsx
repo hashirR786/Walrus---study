@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Timer, Award, Layers, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Zap, RotateCcw, Sparkles, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { API_BASE } from '../config';
@@ -78,21 +78,41 @@ const QUESTION_TYPES = [
   { key: 'LA',    label: 'Long Answer',         desc: '5-mark questions — full derivations, two-part questions' },
 ];
 
-export default function PracticeEngine({ progressData, onSaveTestResult }) {
-  const [activeSubTab, setActiveSubTab] = useState('mock-tests'); // mock-tests | quick-practice | flashcards
-  const [subject, setSubject] = useState(SUBJECTS[0]);
-  const [chapter, setChapter] = useState('All Chapters');
+export default function PracticeEngine({ progressData, onSaveTestResult, user, activeTab }) {
+  // Load cached active test state from localStorage if available
+  const [activeTestCache] = useState(() => {
+    try {
+      const cached = localStorage.getItem('walrus_active_test');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [activeSubTab, setActiveSubTab] = useState(() => activeTestCache?.activeSubTab || 'mock-tests');
+  const [subject, setSubject] = useState(() => activeTestCache?.subject || SUBJECTS[0]);
+  const [chapter, setChapter] = useState(() => activeTestCache?.chapter || 'All Chapters');
 
   // Mock test state
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPaper, setCurrentPaper] = useState(null);
-  const [studentAnswers, setStudentAnswers] = useState({});
-  const [testActive, setTestActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [testDuration, setTestDuration] = useState(60);
-  const [evaluation, setEvaluation] = useState(null);
-  const [errorAnalysis, setErrorAnalysis] = useState(null);
+  const [currentPaper, setCurrentPaper] = useState(() => activeTestCache?.currentPaper || null);
+  const [studentAnswers, setStudentAnswers] = useState(() => activeTestCache?.studentAnswers || {});
+  const [testActive, setTestActive] = useState(() => activeTestCache?.testActive || false);
+  const [timeLeft, setTimeLeft] = useState(() => activeTestCache?.timeLeft || 0);
+  const [testDuration, setTestDuration] = useState(() => activeTestCache?.testDuration || 60);
+  const [evaluation, setEvaluation] = useState(() => activeTestCache?.evaluation || null);
+  const [errorAnalysis, setErrorAnalysis] = useState(() => activeTestCache?.errorAnalysis || null);
   const [isAnalyzingErrors, setIsAnalyzingErrors] = useState(false);
+
+  const [strictMode, setStrictMode] = useState(() => activeTestCache?.strictMode || false);
+  const [violations, setViolations] = useState(() => activeTestCache?.violations || 0);
+  const [violationWarning, setViolationWarning] = useState(null); // { count, reason }
+  const [isTerminatedByStrict, setIsTerminatedByStrict] = useState(false);
+
+  // History & review
+  const [testHistory, setTestHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedHistoryTest, setSelectedHistoryTest] = useState(null);
 
   // Quick practice state
   const [qpSelectedChapters, setQpSelectedChapters] = useState([]);
@@ -114,7 +134,13 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
   const [newAnswer, setNewAnswer] = useState('');
   const [fcChapter, setFcChapter] = useState('All Chapters');
 
+  const isInitialRender = useRef(true);
+
   useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
     setChapter('All Chapters');
     setFcChapter('All Chapters');
     setSelectedBox('All');
@@ -122,6 +148,178 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
     setIsFlipped(false);
     setQpSelectedChapters([]);
   }, [subject]);
+
+  // Sync test changes to localStorage cache
+  useEffect(() => {
+    try {
+      const activeTest = {
+        activeSubTab,
+        subject,
+        chapter,
+        currentPaper,
+        studentAnswers,
+        testActive,
+        timeLeft,
+        testDuration,
+        evaluation,
+        errorAnalysis,
+        strictMode,
+        violations
+      };
+      localStorage.setItem('walrus_active_test', JSON.stringify(activeTest));
+    } catch (err) {
+      console.error('Failed to cache active test:', err);
+    }
+  }, [activeSubTab, subject, chapter, currentPaper, studentAnswers, testActive, timeLeft, testDuration, evaluation, errorAnalysis, strictMode, violations]);
+
+  // Fetch test history
+  const fetchTestHistory = async () => {
+    if (!user?._id) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/student/tests?userId=${user._id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setTestHistory(data);
+      }
+    } catch (err) {
+      console.error('Failed to load test history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'practice-engine') {
+      fetchTestHistory();
+    }
+  }, [user?._id, activeTab]);
+
+  // Strict Mode Helper functions
+  const enterFullscreen = () => {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch(err => console.warn('Fullscreen request failed:', err));
+    } else if (elem.webkitRequestFullscreen) {
+      elem.webkitRequestFullscreen();
+    }
+  };
+
+  const isCurrentlyFullscreen = () => {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  };
+
+  const triggerViolation = (reason) => {
+    if (!testActive) return;
+    setViolations(prev => {
+      const next = prev + 1;
+      if (next >= 3) {
+        setIsTerminatedByStrict(true);
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(e => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+        setViolationWarning(null);
+        handleSubmitTest();
+        return 0; // reset
+      } else {
+        setViolationWarning({ count: next, reason });
+        return next;
+      }
+    });
+  };
+
+  // Strict mode event listeners
+  useEffect(() => {
+    if (!testActive || !strictMode) return;
+
+    const handleFullscreenChange = () => {
+      if (!isCurrentlyFullscreen() && !violationWarning) {
+        triggerViolation("You exited Fullscreen mode.");
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && !violationWarning) {
+        triggerViolation("You switched tabs or minimized the window.");
+      }
+    };
+
+    const handleWindowBlur = () => {
+      if (!violationWarning) {
+        triggerViolation("You clicked outside the exam window.");
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [testActive, strictMode, violationWarning]);
+
+  // Download test attempt markdown
+  const downloadTestAttempt = (test) => {
+    let content = `# Walrus - CBSE Mock Test Paper Attempt\n\n`;
+    content += `**Subject**: ${test.subject}\n`;
+    content += `**Chapter**: ${test.chapter || 'All Chapters'}\n`;
+    content += `**Attempted At**: ${new Date(test.attemptedAt || test.createdAt || Date.now()).toLocaleString()}\n`;
+    content += `**Score**: ${test.score} / ${test.totalMarks}\n\n`;
+    content += `## AI Feedback & Marking Scheme\n${test.feedback || 'No feedback available.'}\n\n`;
+    content += `## Questions & Answers\n\n`;
+    
+    if (test.generatedPaper && test.generatedPaper.sections) {
+      const sectionNames = {
+        A: 'A (MCQ & Assertion-Reason)',
+        B: 'B (Very Short Answer)',
+        C: 'C (Short Answer)',
+        D: 'D (Long Answer / Derivation)',
+        E: 'E (Case Study)'
+      };
+      
+      Object.keys(test.generatedPaper.sections).forEach(secKey => {
+        const questions = test.generatedPaper.sections[secKey] || [];
+        if (questions.length === 0) return;
+        
+        content += `### Section ${sectionNames[secKey] || secKey}\n\n`;
+        questions.forEach((q) => {
+          content += `**Q${q.id || ''}. ${q.question || q.questionText || ''}** (Marks: ${q.marks || 1})\n\n`;
+          if (q.options) {
+            content += `Options:\n`;
+            q.options.forEach(opt => {
+              content += `- ${opt}\n`;
+            });
+            content += `\n`;
+          }
+          content += `**Your Response**:\n${test.answers?.[q.id] || '_No response_'}\n\n`;
+          
+          const correctAns = q.answer || q.correctAnswer;
+          if (correctAns) {
+            content += `**Correct/Model Answer**:\n${correctAns}\n\n`;
+          }
+          content += `---\n\n`;
+        });
+      });
+    }
+    
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date(test.attemptedAt || test.createdAt || Date.now()).toISOString().split('T')[0];
+    link.setAttribute('download', `Walrus_MockTest_${test.subject.replace(/ /g, '_')}_${dateStr}.md`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Timer
   useEffect(() => {
@@ -595,107 +793,248 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
       {/* ── TAB: MOCK TEST ─────────────────────────────────────────────────── */}
       {activeSubTab === 'mock-tests' && (
         <div>
-          {!testActive && !evaluation && (
-            <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem' }}>
-              <Layers size={48} style={{ color: 'var(--primary)', marginBottom: '1rem', margin: '0 auto' }} />
-              <h3>Build CBSE Mock Test Paper</h3>
-              <p style={{ color: 'var(--text-secondary)', maxWidth: '520px', margin: '0.5rem auto 2rem' }}>
-                Generate a full-length board-pattern paper covering MCQs, short answers, long answers and case studies — tailored to your selected chapter.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
-                <div className="input-group" style={{ minWidth: '200px', textAlign: 'left' }}>
-                  <label>Chapter Scope</label>
-                  <select className="input-control" value={chapter} onChange={e => setChapter(e.target.value)}>
-                    <option value="All Chapters">All Chapters (Full Syllabus)</option>
-                    {chaptersForSubject.map(ch => <option key={ch} value={ch}>{ch}</option>)}
-                  </select>
+          {!testActive && !evaluation && !currentPaper && (
+            <>
+              <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem' }}>
+                <Layers size={48} style={{ color: 'var(--primary)', marginBottom: '1rem', margin: '0 auto' }} />
+                <h3>Build CBSE Mock Test Paper</h3>
+                <p style={{ color: 'var(--text-secondary)', maxWidth: '520px', margin: '0.5rem auto 2rem' }}>
+                  Generate a full-length board-pattern paper covering MCQs, short answers, long answers and case studies — tailored to your selected chapter.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+                  <div className="input-group" style={{ minWidth: '200px', textAlign: 'left' }}>
+                    <label>Chapter Scope</label>
+                    <select className="input-control" value={chapter} onChange={e => setChapter(e.target.value)}>
+                      <option value="All Chapters">All Chapters (Full Syllabus)</option>
+                      {chaptersForSubject.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ minWidth: '200px', textAlign: 'left' }}>
+                    <label>Duration &amp; Marks</label>
+                    <select className="input-control" value={testDuration} onChange={e => setTestDuration(parseInt(e.target.value))}>
+                      <option value={30}>30 min — 15 marks (MCQ Sprint)</option>
+                      <option value={60}>60 min — 25 marks (Unit Test)</option>
+                      <option value={120}>120 min — 50 marks (Half Paper)</option>
+                      <option value={180}>180 min — 80 marks (Full Board Sim)</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="input-group" style={{ minWidth: '200px', textAlign: 'left' }}>
-                  <label>Duration &amp; Marks</label>
-                  <select className="input-control" value={testDuration} onChange={e => setTestDuration(parseInt(e.target.value))}>
-                    <option value={30}>30 min — 15 marks (MCQ Sprint)</option>
-                    <option value={60}>60 min — 25 marks (Unit Test)</option>
-                    <option value={120}>120 min — 50 marks (Half Paper)</option>
-                    <option value={180}>180 min — 80 marks (Full Board Sim)</option>
-                  </select>
+
+                {/* Strict Mode Toggle & Desktop Notice */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1.75rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', maxWidth: '550px', margin: '0 auto 2rem' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.92rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={strictMode} 
+                      onChange={e => setStrictMode(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                    />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertTriangle size={16} style={{ color: 'var(--warning)' }} /> Enable Strict Exam Mode
+                    </span>
+                  </label>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.4 }}>
+                    <strong>Desktop required.</strong> Locks screen in fullscreen. Switching tabs, minimizing, or losing focus will trigger a violation warning. Exceeding 3 violations auto-submits.
+                  </p>
                 </div>
+
+                {/* Live paper structure preview */}
+                {(() => {
+                  const SECTION_INFO = {
+                    'A (MCQ)': 'Multiple Choice Questions & Assertion–Reason pairs. Pick one correct option from four choices. Each carries 1 mark with no negative marking.',
+                    'B (VSA)': 'Very Short Answer questions. Write a precise answer in 2–3 sentences or solve a short numerical. Each carries 2 marks.',
+                    'C (SA)':  'Short Answer questions. Explain a concept, derive a formula, or solve a problem with full steps. Each carries 3 marks.',
+                    'D (LA)':  'Long Answer / Derivation questions. Detailed 2-part questions covering full derivations, diagrams, and numerical applications. Each carries 5 marks.',
+                    'E (Case)':'Case Study / Source-based questions. Read a short passage or diagram and answer related sub-questions. Each set carries 4 marks.',
+                  };
+                  const durationMeta = {
+                    30:  { marks: 15, label: 'MCQ Sprint',       sections: [{ name: 'A (MCQ)', count: 15, each: 1 }] },
+                    60:  { marks: 25, label: 'Unit Test',        sections: [{ name: 'A (MCQ)', count: 5, each: 1 }, { name: 'B (VSA)', count: 4, each: 2 }, { name: 'C (SA)', count: 4, each: 3 }] },
+                    120: { marks: 50, label: 'Half Paper',       sections: [{ name: 'A (MCQ)', count: 10, each: 1 }, { name: 'B (VSA)', count: 5, each: 2 }, { name: 'C (SA)', count: 5, each: 3 }, { name: 'D (LA)', count: 3, each: 5 }] },
+                    180: { marks: 80, label: 'Full Board Paper', sections: [{ name: 'A (MCQ)', count: 20, each: 1 }, { name: 'B (VSA)', count: 6, each: 2 }, { name: 'C (SA)', count: 7, each: 3 }, { name: 'D (LA)', count: 3, each: 5 }, { name: 'E (Case)', count: 3, each: 4 }] },
+                  };
+                  const meta = durationMeta[testDuration];
+                  if (!meta) return null;
+                  return (
+                    <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+                      <p style={{ margin: '0 0 0.75rem', fontWeight: 700, fontSize: '0.9rem', color: 'var(--primary)' }}>📋 Paper Structure — {meta.label} · {meta.marks} Marks Total</p>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {meta.sections.map(sec => (
+                          <div key={sec.name} style={{ position: 'relative', background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '0.5rem 0.9rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}
+                            className="section-info-card">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              Section {sec.name}
+                              <span
+                                className="section-info-trigger"
+                                title={SECTION_INFO[sec.name]}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  width: '14px', height: '14px', borderRadius: '50%',
+                                  background: 'var(--primary)', color: '#fff',
+                                  fontSize: '9px', fontWeight: 700, cursor: 'default',
+                                  lineHeight: 1, flexShrink: 0, userSelect: 'none',
+                                  opacity: 0.75
+                                }}
+                              >i</span>
+                            </div>
+                            <div style={{ fontWeight: 400, color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                              {sec.count} Qs × {sec.each}m = {sec.count * sec.each}m
+                            </div>
+                            {/* Tooltip bubble */}
+                            <div className="section-info-tooltip" style={{
+                              position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                              borderRadius: '8px', padding: '0.6rem 0.8rem',
+                              fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 400,
+                              width: '220px', lineHeight: 1.5, boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                              pointerEvents: 'none', opacity: 0, transition: 'opacity 0.15s ease',
+                              zIndex: 50, textAlign: 'left',
+                              whiteSpace: 'normal'
+                            }}>
+                              {SECTION_INFO[sec.name]}
+                              {/* Arrow */}
+                              <span style={{
+                                position: 'absolute', top: '100%', left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: 0, height: 0,
+                                borderLeft: '6px solid transparent',
+                                borderRight: '6px solid transparent',
+                                borderTop: '6px solid var(--border-color)'
+                              }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <button className="btn-primary" onClick={handleStartTest} disabled={isLoading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {isLoading ? <><RefreshCw className="animate-spin" size={16} /> Generating paper…</> : `Generate ${testDuration}-Min Mock Exam`}
+                </button>
               </div>
 
-              {/* Live paper structure preview */}
-              {(() => {
-                const SECTION_INFO = {
-                  'A (MCQ)': 'Multiple Choice Questions & Assertion–Reason pairs. Pick one correct option from four choices. Each carries 1 mark with no negative marking.',
-                  'B (VSA)': 'Very Short Answer questions. Write a precise answer in 2–3 sentences or solve a short numerical. Each carries 2 marks.',
-                  'C (SA)':  'Short Answer questions. Explain a concept, derive a formula, or solve a problem with full steps. Each carries 3 marks.',
-                  'D (LA)':  'Long Answer / Derivation questions. Detailed 2-part questions covering full derivations, diagrams, and numerical applications. Each carries 5 marks.',
-                  'E (Case)':'Case Study / Source-based questions. Read a short passage or diagram and answer related sub-questions. Each set carries 4 marks.',
-                };
-                const durationMeta = {
-                  30:  { marks: 15, label: 'MCQ Sprint',       sections: [{ name: 'A (MCQ)', count: 15, each: 1 }] },
-                  60:  { marks: 25, label: 'Unit Test',        sections: [{ name: 'A (MCQ)', count: 5, each: 1 }, { name: 'B (VSA)', count: 4, each: 2 }, { name: 'C (SA)', count: 4, each: 3 }] },
-                  120: { marks: 50, label: 'Half Paper',       sections: [{ name: 'A (MCQ)', count: 10, each: 1 }, { name: 'B (VSA)', count: 5, each: 2 }, { name: 'C (SA)', count: 5, each: 3 }, { name: 'D (LA)', count: 3, each: 5 }] },
-                  180: { marks: 80, label: 'Full Board Paper', sections: [{ name: 'A (MCQ)', count: 20, each: 1 }, { name: 'B (VSA)', count: 6, each: 2 }, { name: 'C (SA)', count: 7, each: 3 }, { name: 'D (LA)', count: 3, each: 5 }, { name: 'E (Case)', count: 3, each: 4 }] },
-                };
-                const meta = durationMeta[testDuration];
-                if (!meta) return null;
-                return (
-                  <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.5rem', textAlign: 'left' }}>
-                    <p style={{ margin: '0 0 0.75rem', fontWeight: 700, fontSize: '0.9rem', color: 'var(--primary)' }}>📋 Paper Structure — {meta.label} · {meta.marks} Marks Total</p>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {meta.sections.map(sec => (
-                        <div key={sec.name} style={{ position: 'relative', background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '0.5rem 0.9rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}
-                          className="section-info-card">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            Section {sec.name}
-                            <span
-                              className="section-info-trigger"
-                              title={SECTION_INFO[sec.name]}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                width: '14px', height: '14px', borderRadius: '50%',
-                                background: 'var(--primary)', color: '#fff',
-                                fontSize: '9px', fontWeight: 700, cursor: 'default',
-                                lineHeight: 1, flexShrink: 0, userSelect: 'none',
-                                opacity: 0.75
-                              }}
-                            >i</span>
+              {/* PAST EXAM ATTEMPTS SECTION */}
+              <div className="card" style={{ marginTop: '2rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '1.15rem', color: 'var(--text-primary)' }}>
+                  <Award size={22} style={{ color: 'var(--primary)' }} /> Past Mock Test Attempts
+                </h3>
+                
+                {historyLoading ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                    <RefreshCw className="animate-spin" size={20} style={{ margin: '0 auto 0.5rem' }} />
+                    <span>Loading attempt history…</span>
+                  </div>
+                ) : testHistory.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2.5rem 2rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    No mock test attempts recorded yet. Select options above and start your first exam!
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {testHistory.map(test => {
+                      const pct = Math.round((test.score / test.totalMarks) * 100);
+                      return (
+                        <div key={test._id} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)',
+                          backgroundColor: 'var(--bg-card)', flexWrap: 'wrap', gap: '1rem'
+                        }}>
+                          <div style={{ flex: 1, minWidth: '200px' }}>
+                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {test.subject} Mock Test
+                            </h4>
+                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                              Chapter: <strong style={{ color: 'var(--primary)' }}>{test.chapter || 'All Chapters'}</strong> &nbsp;·&nbsp; 
+                              Attempted: {new Date(test.attemptedAt || test.createdAt).toLocaleDateString()} at {new Date(test.attemptedAt || test.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
-                          <div style={{ fontWeight: 400, color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                            {sec.count} Qs × {sec.each}m = {sec.count * sec.each}m
-                          </div>
-                          {/* Tooltip bubble */}
-                          <div className="section-info-tooltip" style={{
-                            position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
-                            transform: 'translateX(-50%)',
-                            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                            borderRadius: '8px', padding: '0.6rem 0.8rem',
-                            fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 400,
-                            width: '220px', lineHeight: 1.5, boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-                            pointerEvents: 'none', opacity: 0, transition: 'opacity 0.15s ease',
-                            zIndex: 50, textAlign: 'left',
-                            whiteSpace: 'normal'
-                          }}>
-                            {SECTION_INFO[sec.name]}
-                            {/* Arrow */}
-                            <span style={{
-                              position: 'absolute', top: '100%', left: '50%',
-                              transform: 'translateX(-50%)',
-                              width: 0, height: 0,
-                              borderLeft: '6px solid transparent',
-                              borderRight: '6px solid transparent',
-                              borderTop: '6px solid var(--border-color)'
-                            }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {test.score} / {test.totalMarks}
+                              </span>
+                              <span style={{
+                                marginLeft: '0.5rem', fontSize: '0.75rem', fontWeight: 700,
+                                padding: '0.15rem 0.5rem', borderRadius: '50px',
+                                backgroundColor: pct >= 80 ? 'rgba(95, 117, 96, 0.1)' : pct >= 50 ? 'rgba(217, 159, 89, 0.1)' : 'rgba(176, 90, 90, 0.1)',
+                                color: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
+                                border: `1px solid ${pct >= 80 ? 'rgba(95, 117, 96, 0.2)' : pct >= 50 ? 'rgba(217, 159, 89, 0.2)' : 'rgba(176, 90, 90, 0.2)'}`
+                              }}>
+                                {pct}%
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button 
+                                className="btn-secondary" 
+                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                                onClick={() => setSelectedHistoryTest(test)}
+                              >
+                                Review
+                              </button>
+                              <button 
+                                className="btn-secondary" 
+                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                onClick={() => downloadTestAttempt(test)}
+                              >
+                                Download
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })()}
+                )}
+              </div>
+            </>
+          )}
 
-              <button className="btn-primary" onClick={handleStartTest} disabled={isLoading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                {isLoading ? <><RefreshCw className="animate-spin" size={16} /> Generating paper…</> : `Generate ${testDuration}-Min Mock Exam`}
-              </button>
+          {!testActive && !evaluation && currentPaper && (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+              <Sparkles size={48} style={{ color: 'var(--primary)', marginBottom: '1rem', margin: '0 auto' }} />
+              <h3>CBSE Exam Paper Generated Successfully!</h3>
+              <p style={{ color: 'var(--text-secondary)', maxWidth: '520px', margin: '0.5rem auto 1.5rem' }}>
+                Your custom exam paper for <strong>{currentPaper.subject}</strong> (Chapter: {currentPaper.chapter}) is ready.
+              </p>
+
+              <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left', maxWidth: '500px', margin: '0 auto 2rem' }}>
+                <h4 style={{ marginTop: 0, marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Exam Details:</h4>
+                <ul style={{ paddingLeft: '1.25rem', margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <li><strong>Total Marks:</strong> {currentPaper.totalMarks} Marks</li>
+                  <li><strong>Target Duration:</strong> {testDuration} Minutes</li>
+                  <li><strong>Strict Mode:</strong> {strictMode ? 'Enabled 🟢 (Fullscreen locked)' : 'Disabled 🔴'}</li>
+                </ul>
+
+                {strictMode && (
+                  <div style={{ marginTop: '1.25rem', padding: '0.75rem 1rem', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(239, 68, 68, 0.05)', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <AlertTriangle size={18} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#ef4444', lineHeight: 1.4 }}>
+                      <strong>Strict Mode Warnings:</strong> The exam runs in Fullscreen. Do NOT switch tabs, minimize, or click outside the window. Any such action triggers a violation warning. 3 violations auto-submits the exam.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+                <button className="btn-secondary" onClick={() => setCurrentPaper(null)}>
+                  Cancel &amp; Re-configure
+                </button>
+                <button 
+                  className="btn-primary" 
+                  onClick={() => {
+                    setViolations(0);
+                    setTimeLeft(testDuration * 60);
+                    setTestActive(true);
+                    if (strictMode) {
+                      enterFullscreen();
+                    }
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  Start Exam Attempt
+                </button>
+              </div>
             </div>
           )}
 
@@ -1239,6 +1578,239 @@ export default function PracticeEngine({ progressData, onSaveTestResult }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Strict Mode Violation Warning Overlay */}
+      {violationWarning && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="card" style={{ maxWidth: '480px', width: '90%', border: '2px solid var(--danger)', padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)' }}>
+            <AlertTriangle size={48} style={{ color: 'var(--danger)', marginBottom: '1rem', margin: '0 auto' }} />
+            <h3 style={{ color: 'var(--danger)', marginTop: 0 }}>Strict Mode Violation Alert!</h3>
+            <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '600', margin: '1rem 0' }}>
+              Reason: {violationWarning.reason}
+            </p>
+            <div style={{ background: 'rgba(176, 90, 90, 0.1)', border: '1px solid rgba(176, 90, 90, 0.2)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--danger)' }}>
+                Violation Count: {violationWarning.count} / 3
+              </span>
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                If you exceed 3 violations, your exam will be terminated immediately and your current answers will be submitted automatically.
+              </p>
+            </div>
+            <button 
+              className="btn-primary" 
+              onClick={() => {
+                enterFullscreen();
+                setViolationWarning(null);
+              }}
+              style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none', padding: '0.75rem 2rem', fontWeight: 'bold' }}
+            >
+              Resume Exam
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Strict Mode Terminated Modal */}
+      {isTerminatedByStrict && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="card" style={{ maxWidth: '480px', width: '90%', border: '2px solid var(--danger)', padding: '2.5rem 2rem', textAlign: 'center', backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)' }}>
+            <AlertCircle size={56} style={{ color: 'var(--danger)', marginBottom: '1.25rem', margin: '0 auto' }} />
+            <h3 style={{ color: 'var(--danger)', marginTop: 0 }}>Exam Terminated</h3>
+            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '1rem 0 1.5rem' }}>
+              Your exam attempt was automatically terminated and submitted because the limit of 3 Strict Mode violations was exceeded.
+            </p>
+            <button 
+              className="btn-primary" 
+              onClick={() => setIsTerminatedByStrict(false)}
+              style={{ padding: '0.75rem 2rem', fontWeight: 'bold' }}
+            >
+              View Results
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Test Attempt Review Modal */}
+      {selectedHistoryTest && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          padding: '1rem', backdropFilter: 'blur(2px)'
+        }}>
+          <div className="card" style={{
+            maxWidth: '850px', width: '100%', maxHeight: '90vh',
+            display: 'flex', flexDirection: 'column',
+            backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1rem',
+              flexShrink: 0
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>CBSE Mock Test Review</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {selectedHistoryTest.subject} &nbsp;·&nbsp; {selectedHistoryTest.chapter || 'All Chapters'}
+                </span>
+              </div>
+              <button 
+                style={{ background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1 }}
+                onClick={() => setSelectedHistoryTest(null)}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Metadata Summary */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)', padding: '0.75rem 1.25rem', marginBottom: '1.25rem',
+              flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0
+            }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Attempted: </span>
+                <strong style={{ fontSize: '0.85rem' }}>{new Date(selectedHistoryTest.attemptedAt || selectedHistoryTest.createdAt).toLocaleString()}</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <span style={{ fontSize: '0.85rem' }}>
+                  Score: <strong style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>{selectedHistoryTest.score}</strong> / {selectedHistoryTest.totalMarks}
+                </span>
+                <span className="badge badge-success" style={{ fontWeight: 700 }}>
+                  {Math.round((selectedHistoryTest.score / selectedHistoryTest.totalMarks) * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              
+              {/* AI Assessment Report */}
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', backgroundColor: 'var(--bg-app)' }}>
+                <h4 style={{ color: 'var(--primary)', marginTop: 0, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Award size={18} /> AI Feedback &amp; Marking Scheme
+                </h4>
+                <div className="markdown-body">
+                  <MarkdownRenderer content={selectedHistoryTest.feedback} />
+                </div>
+              </div>
+
+              {/* Questions & Responses Review */}
+              <div>
+                <h4 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                  Questions &amp; Responses Review
+                </h4>
+                {selectedHistoryTest.generatedPaper?.sections ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {Object.keys(selectedHistoryTest.generatedPaper.sections).map(secKey => {
+                      const questions = selectedHistoryTest.generatedPaper.sections[secKey] || [];
+                      if (questions.length === 0) return null;
+                      return (
+                        <div key={secKey} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                          <h5 style={{ margin: '0 0 1rem 0', color: 'var(--primary)' }}>Section {secKey}</h5>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                            {questions.map(q => {
+                              const studentAns = selectedHistoryTest.answers?.[q.id];
+                              const correctAns = q.answer || q.correctAnswer;
+                              const isMCQ = !!q.options;
+                              const isCorrect = isMCQ && studentAns === correctAns;
+
+                              return (
+                                <div key={q.id} style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                                  <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                    Q{q.id}. {q.question || q.questionText} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>[{q.marks}m]</span>
+                                  </p>
+
+                                  {isMCQ ? (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', paddingLeft: '1rem', margin: '0.5rem 0' }}>
+                                      {q.options.map(opt => {
+                                        const isSelected = studentAns === opt;
+                                        const isOptCorrect = opt === correctAns;
+                                        let border = 'var(--border-color)';
+                                        let bg = 'transparent';
+                                        let fontW = 'normal';
+                                        
+                                        if (isOptCorrect) {
+                                          border = 'var(--success)';
+                                          bg = 'rgba(95, 117, 96, 0.08)';
+                                          fontW = 'bold';
+                                        } else if (isSelected) {
+                                          border = 'var(--danger)';
+                                          bg = 'rgba(176, 90, 90, 0.08)';
+                                        }
+
+                                        return (
+                                          <div key={opt} style={{
+                                            padding: '0.4rem 0.6rem', border: `1px solid ${border}`,
+                                            borderRadius: 'var(--radius-sm)', fontSize: '0.82rem',
+                                            backgroundColor: bg, fontWeight: fontW, display: 'flex', alignItems: 'center', gap: '0.4rem'
+                                          }}>
+                                            <span style={{ fontSize: '0.9rem' }}>
+                                              {isOptCorrect ? '✅' : isSelected ? '❌' : '•'}
+                                            </span>
+                                            <span>{opt}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0.5rem 0' }}>
+                                      <div style={{ padding: '0.6rem 0.8rem', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>YOUR RESPONSE:</span>
+                                        <p style={{ margin: 0, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{studentAns || '_No response submitted_'}</p>
+                                      </div>
+                                      {correctAns && (
+                                        <div style={{ padding: '0.6rem 0.8rem', backgroundColor: 'rgba(95, 117, 96, 0.04)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)' }}>
+                                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)', display: 'block', marginBottom: '0.2rem' }}>CORRECT/MODEL ANSWER:</span>
+                                          <p style={{ margin: 0, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{correctAns}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Question-level review is not available for this attempt.</p>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              display: 'flex', justifyContent: 'flex-end', gap: '0.75rem',
+              borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem',
+              flexShrink: 0
+            }}>
+              <button className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                onClick={() => downloadTestAttempt(selectedHistoryTest)}>
+                Download MD
+              </button>
+              <button className="btn-primary" onClick={() => setSelectedHistoryTest(null)}>
+                Close Review
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
