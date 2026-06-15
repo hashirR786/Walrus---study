@@ -339,7 +339,7 @@ export default function App() {
           <Menu size={24} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img src="/walrus.jpeg" alt="Walrus Logo" style={{ width: '28px', height: '28px', borderRadius: '6px' }} />
+          <img src="/walrus.png" alt="Walrus Logo" style={{ width: '28px', height: '28px', borderRadius: '6px' }} />
           <span style={{ fontSize: '1.2rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>Walrus</span>
         </div>
         <div style={{ width: '24px' }} />

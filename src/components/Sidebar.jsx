@@ -74,7 +74,7 @@ export default function Sidebar({
       <div className="brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '2.5rem', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img 
-            src="/walrus.jpeg" 
+            src="/walrus.png" 
             alt="Walrus Logo" 
             style={{ 
               width: '44px', 

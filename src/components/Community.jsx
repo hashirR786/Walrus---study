@@ -308,7 +308,7 @@ export default function Community({ progressData, user }) {
 
       {/* ── DOUBT FORUM ── */}
       {activeTab === 'forum' && (
-        <div className="community-threads-grid" style={{ display: 'grid', gridTemplateColumns: selectedThread ? '1fr 1.2fr' : '1fr', gap: '1.5rem' }}>
+        <div className={`community-threads-grid ${selectedThread ? 'has-selected' : ''}`}>
           <div>
             <div className="card" style={{ marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Ask the Community</h3>
@@ -410,7 +410,7 @@ export default function Community({ progressData, user }) {
 
       {/* ── NOTES SHARING ── */}
       {activeTab === 'notes' && (
-        <div className="community-notes-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.8fr', gap: '1.5rem' }}>
+        <div className="community-notes-grid">
           <div className="card" style={{ height: 'fit-content' }}>
             <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Share a Note</h3>
             <form onSubmit={handleShareNote} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
@@ -509,7 +509,7 @@ export default function Community({ progressData, user }) {
 
       {/* ── STUDY ROOM ── */}
       {activeTab === 'study-room' && (
-        <div className="community-room-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.9fr', gap: '1.5rem' }}>
+        <div className="community-room-grid">
           <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', height: 'fit-content' }}>
             <Library size={36} style={{ color: 'var(--primary)', marginBottom: '0.5rem' }} />
             <h3>Virtual Study Room</h3>

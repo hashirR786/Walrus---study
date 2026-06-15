@@ -69,7 +69,7 @@ export default function Auth({ onAuthSuccess, addToast }) {
         {/* Brand Header */}
         <div>
           <img 
-            src="/walrus.jpeg" 
+            src="/walrus.png" 
             alt="Walrus Logo" 
             className="auth-logo-img"
           />

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
 import {
   Camera, Image as ImageIcon, Send, RefreshCw, GraduationCap,
-  Mic, MicOff, History, Plus, Trash2, ChevronLeft, X, Clock
+  Mic, MicOff, History, Plus, Trash2, ChevronLeft, X, Clock, SlidersHorizontal
 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { API_BASE } from '../config';
@@ -44,6 +44,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
   const [mode, setMode] = useState('Doubt Solver');
   const [studentInput, setStudentInput] = useState('');
   const [studentAttempt, setStudentAttempt] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
@@ -384,6 +385,13 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
             </h2>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               {isSaving && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><RefreshCw size={10} className="animate-spin" /> Saving…</span>}
+              <button 
+                onClick={() => setShowFilters(f => !f)} 
+                className={`btn-secondary doubt-solver-settings-toggle-btn ${showFilters ? 'active' : ''}`}
+                style={{ display: 'none', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.4rem 0.85rem', borderColor: showFilters ? 'var(--primary)' : 'var(--border-color)', color: showFilters ? 'var(--primary)' : 'var(--text-primary)' }}
+              >
+                <SlidersHorizontal size={14} /> Settings
+              </button>
               {user && (
                 <button onClick={() => { setShowHistory(h => !h); if (!showHistory) fetchSessions(); }}
                   className="btn-secondary"
@@ -399,7 +407,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user })
             </div>
           </div>
 
-          <div className="doubt-solver-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          <div className={`doubt-solver-grid ${showFilters ? 'show' : ''}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Subject</label>
               <select className="input-control" style={{ padding: '0.45rem 0.7rem', fontSize: '0.88rem', height: '2.1rem', backgroundColor: 'var(--bg-app)' }}
