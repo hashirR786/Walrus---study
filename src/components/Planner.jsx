@@ -31,10 +31,10 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
       const cached = localStorage.getItem('walrus_study_schedule');
       if (cached) {
         const parsed = JSON.parse(cached);
-        return parsed.examDate || '2026-03-01';
+        return parsed.examDate || '2027-03-01';
       }
     } catch {}
-    return '2026-03-01';
+    return '2027-03-01';
   });
 
   const [targetScore, setTargetScore] = useState(() => {
@@ -123,6 +123,11 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
   };
 
   const handleGenerateSchedule = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (examDate && examDate < today) {
+      alert('Target exam date cannot be in the past. Please select a future date.');
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/ai/generate-schedule`, {
