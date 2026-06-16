@@ -28,9 +28,9 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 - Chat with a **CBSE-specialized AI tutor** powered by Google Gemini
 - Understands subject context (Physics, Chemistry, Maths, Biology, Economics)
 - Beautifully rendered **LaTeX equations** and **Markdown** responses
-- Maintains session history so you can pick up where you left off
+- Maintains session history and **persists active chat states** across browser refreshes and tab switches
 
-### 📝 CBSE Mock Test Engine
+### 📝 CBSE Mock Test Engine & Simulator
 - Generate **full-length board-pattern papers** on demand
 - Smart duration-based marking system:
   | Duration | Marks | Paper Type |
@@ -40,9 +40,12 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
   | 120 min  | 50    | Half Paper |
   | 180 min  | 80    | Full Board Simulation |
 - All 5 CBSE section types — **MCQ, VSA, SA, Long Answer, Case Study**
+- **Strict Exam Mode (Desktop)**: Runs exam in fullscreen. Switching tabs, minimizing the window, or exiting fullscreen triggers a warning. 3 warnings automatically submits the paper.
 - Live countdown timer with auto-submit
 - **AI-powered evaluation & scoring** with per-question feedback
-- **Error Analysis Report** — identifies weak topics and generates an action plan
+- **Error Analysis Report** — identifies weak topics and generates a targeted study plan
+- **Detailed Attempt Review**: Open an interactive panel reviewing past mock test attempts with section details, student answers (MCQs color-coded), and model solutions
+- **Markdown Downloads**: Download attempted mock exams as clean `.md` documents including questions, answers, and AI markings
 
 ### ⚡ Quick Practice / PYQ Drill
 - Pick chapters, question type, and count
@@ -70,7 +73,8 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 - **Virtual Study Room** — synchronized Pomodoro timer + peer chat
 
 ### 📅 Planner & Productivity
-- Smart study planner with subject scheduling
+- **AI Syllabus Calendar Builder**: Automatically generates custom weekly study schedules based on exam dates and completed chapters
+- **Persistent Study Schedule**: Caches study schedules in browser storage until the target exam date passes, with validation checks and one-click schedule regeneration options
 - Pomodoro timer integration
 
 ### 👤 Profile & Streaks
@@ -104,6 +108,7 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 ```bash
 git clone https://github.com/YOUR_USERNAME/walrus-study.git
 cd walrus-study
+
 ```
 
 ### 2. Install frontend dependencies
