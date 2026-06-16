@@ -45,16 +45,16 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 <div align="center">
 <table>
 <tr>
-<td width="50%" align="center"><i>Dashboard</i><br/><img src="https://via.placeholder.com/420x260/0F2027/4285F4?text=Dashboard+Screenshot" width="100%"/></td>
-<td width="50%" align="center"><i>AI Doubt Solver</i><br/><img src="https://via.placeholder.com/420x260/0F2027/47A248?text=Doubt+Solver+Screenshot" width="100%"/></td>
+<td width="50%" align="center"><i>Dashboard</i><br/><img src="./screenshots/dashboard.png" width="100%"/></td>
+<td width="50%" align="center"><i>AI Doubt Solver</i><br/><img src="./screenshots/doubt-solver.png" width="100%"/></td>
 </tr>
 <tr>
-<td width="50%" align="center"><i>Mock Test Simulator</i><br/><img src="https://via.placeholder.com/420x260/0F2027/FFD43B?text=Mock+Test+Screenshot" width="100%"/></td>
-<td width="50%" align="center"><i>Flashcards</i><br/><img src="https://via.placeholder.com/420x260/0F2027/FF6B6B?text=Flashcards+Screenshot" width="100%"/></td>
+<td width="50%" align="center"><i>Mock Test Simulator</i><br/><img src="./screenshots/mock-test.png" width="100%"/></td>
+<td width="50%" align="center"><i>Flashcards</i><br/><img src="./screenshots/flashcards.png" width="100%"/></td>
 </tr>
 </table>
 
-<sub>👆 swap these placeholder images for real screenshots or a GIF demo of the app in action</sub>
+<sub>👆 drop matching PNGs into a <code>screenshots/</code> folder at your repo root (filenames above) and they'll appear here automatically</sub>
 </div>
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
