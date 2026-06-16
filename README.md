@@ -54,7 +54,6 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 </tr>
 </table>
 
-<sub>👆 drop matching PNGs into a <code>screenshots/</code> folder at your repo root (filenames above) and they'll appear here automatically</sub>
 </div>
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
