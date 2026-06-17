@@ -12,6 +12,7 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 [![Gemini](https://img.shields.io/badge/Google-Gemini_AI-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
 
 <br/>
@@ -64,9 +65,10 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 <summary><b>🤖 AI Doubt Solver</b></summary>
 <br/>
 
-- Chat with a **CBSE-specialized AI tutor** powered by Google Gemini
+- Chat with a **CBSE-specialized AI tutor** powered by Google Gemini (upgraded to `gemini-2.5-flash`)
 - Understands subject context (Physics, Chemistry, Maths, Biology, Economics)
 - Beautifully rendered **LaTeX equations** and **Markdown** responses
+- Caches responses in **Redis** (Upstash in cloud, custom RedVER engine locally) for instant `<3ms` hits
 - Maintains session history and **persists active chat states** across browser refreshes and tab switches
 </details>
 
@@ -155,7 +157,7 @@ Generate **full-length board-pattern papers** on demand with a smart duration-ba
 ## 🛠 Tech Stack
 
 <div align="center">
-<img src="https://skillicons.dev/icons?i=react,vite,nodejs,express,mongodb,javascript,css,git&theme=dark" />
+<img src="https://skillicons.dev/icons?i=react,vite,nodejs,express,mongodb,redis,javascript,css,git&theme=dark" />
 </div>
 
 <br/>
@@ -165,7 +167,8 @@ Generate **full-length board-pattern papers** on demand with a smart duration-ba
 | **Frontend** | React 19, Vite 8, Vanilla CSS |
 | **Backend** | Node.js, Express.js |
 | **Database** | MongoDB Atlas (Mongoose ODM) |
-| **AI** | Google Gemini API |
+| **Cache** | Redis (Upstash Cloud / RedVER Local) |
+| **AI** | Google Gemini API (gemini-2.5-flash) |
 | **Auth** | JWT + bcryptjs |
 | **OCR** | Tesseract.js |
 | **Icons** | Lucide React |
@@ -177,6 +180,7 @@ Generate **full-length board-pattern papers** on demand with a smart duration-ba
 ### Prerequisites
 - Node.js ≥ 18
 - A [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster
+- A Redis Cache server (Upstash Cloud or local RedVER engine)
 - A [Google Gemini API key](https://ai.google.dev)
 
 ### 1️⃣ Clone the repository
@@ -204,6 +208,7 @@ MONGODB_URI=your_mongodb_atlas_connection_string
 GEMINI_API_KEY=your_google_gemini_api_key
 JWT_SECRET=your_super_secret_jwt_key
 PORT=5000
+REDIS_URL=redis://127.0.0.1:6379
 ```
 
 ### 5️⃣ Run the app
@@ -277,6 +282,7 @@ walrus-study/
 | `MONGODB_URI` | MongoDB Atlas connection string | ✅ |
 | `GEMINI_API_KEY` | Google Gemini API key | ✅ |
 | `JWT_SECRET` | Secret key for JWT signing | ✅ |
+| `REDIS_URL` | Redis connection URL (`redis://` or `rediss://`) | ✅ |
 | `PORT` | Backend server port (default: 5000) | ❌ |
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
