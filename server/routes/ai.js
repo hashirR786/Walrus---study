@@ -97,7 +97,7 @@ async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temper
   };
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
   );
 
@@ -151,7 +151,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       0.2
     );
     console.log('✅ Gemini answered successfully');
-    const successResponse = { response: reply, model: 'gemini-1.5-flash' };
+    const successResponse = { response: reply, model: 'gemini-2.5-flash' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
