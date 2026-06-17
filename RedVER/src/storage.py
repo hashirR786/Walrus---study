@@ -94,6 +94,18 @@ class StorageEngine:
             return None
         return self._db.get(key, None)
 
+    def cmd_hello(self, *args):
+        # Return a standard RESP2 server info handshake array to satisfy modern clients (like node-redis)
+        return [
+            "server", "redis",
+            "version", "6.0.0",
+            "proto", 2,
+            "id", 1,
+            "mode", "standalone",
+            "role", "master",
+            "modules", []
+        ]
+
     def cmd_incr(self, key: str):
         self._is_expired(key)  # passive evict if needed
         val_str = self._db.get(key, "0")
