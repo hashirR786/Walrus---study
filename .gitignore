@@ -40,3 +40,13 @@ dist-ssr
 *.sln
 *.sw?
 *.local
+
+# ── Python & RedVER ───────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
+*.aof
+*.rdb
+dump.rdb
+appendonly.aof

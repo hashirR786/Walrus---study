@@ -118,6 +118,32 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     }
   }, [activeTab, fetchSessions]);
 
+  // ── Restore active chat session from RedVER on mount ────────────────────────
+  useEffect(() => {
+    const restoreActiveChatFromRedVER = async () => {
+      if (!user?.username) return;
+      try {
+        const res = await fetch(`${API_BASE}/student/chat-sessions/active?username=${encodeURIComponent(user.username)}`);
+        const session = await res.json();
+        if (session) {
+          console.log("⚡ Restored active chat workspace from RedVER cache!");
+          currentSessionIdRef.current = session._id;
+          setCurrentSessionId(session._id);
+          setSubject(session.subject || SUBJECTS_LIST[0]);
+          setChapter(session.chapter || 'All Chapters');
+          setMode(session.mode || 'Doubt Solver');
+          setMessages([
+            INITIAL_MESSAGE,
+            ...session.messages.map(m => ({ ...m }))
+          ]);
+        }
+      } catch (err) {
+        console.warn("Could not restore active chat from RedVER:", err.message);
+      }
+    };
+    restoreActiveChatFromRedVER();
+  }, [user?.username]);
+
   // ── persistSession: called directly after each AI reply ──────────────────
   const persistSession = async (msgs, sessId, subj, chap, mod) => {
     if (!user?.username) return null;
@@ -180,6 +206,14 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     setStudentAttempt('');
     setAttachedImage(null);
     setShowHistory(false);
+
+    if (user?.username) {
+      fetch(`${API_BASE}/student/chat-sessions/active/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username })
+      }).catch(err => console.warn('Failed to clear active session cache in RedVER:', err));
+    }
   };
 
   // ── Load a past session ─────────────────────────────────────────────────────
@@ -194,6 +228,17 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
       ...session.messages.map(m => ({ ...m }))
     ]);
     setShowHistory(false);
+
+    if (user?.username) {
+      fetch(`${API_BASE}/student/chat-sessions/active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: user.username,
+          session
+        })
+      }).catch(err => console.warn('Failed to update active session cache in RedVER:', err));
+    }
   };
 
   // ── Delete a session ────────────────────────────────────────────────────────

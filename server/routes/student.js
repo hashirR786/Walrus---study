@@ -7,6 +7,7 @@ import StudyRoomMessage from '../models/StudyRoomMessage.js';
 import User from '../models/User.js';
 import ChatSession from '../models/ChatSession.js';
 import Flashcard from '../models/Flashcard.js';
+import { safeCache } from '../config/cache.js';
 
 const router = express.Router();
 
@@ -468,10 +469,22 @@ router.get('/chat-sessions', async (req, res) => {
   const { username } = req.query;
   if (!username) return res.status(400).json({ error: 'username query param required' });
   try {
+    const cacheKey = `student:chats:${username}`;
+    const cachedData = await safeCache.get(cacheKey);
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
+
     const sessions = await ChatSession.find({ username })
       .sort({ updatedAt: -1 })
       .limit(50)
       .select('_id subject chapter mode title createdAt updatedAt messages');
+      
+    try {
+      await safeCache.set(cacheKey, JSON.stringify(sessions), { EX: 1800 });
+    } catch (e) {
+      console.warn('RedVER write error for chat sessions:', e.message);
+    }
     return res.json(sessions);
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -489,23 +502,36 @@ router.post('/chat-sessions', async (req, res) => {
       ? firstUserMsg.content.slice(0, 60) + (firstUserMsg.content.length > 60 ? '…' : '')
       : `${subject || 'Session'} — ${new Date().toLocaleDateString()}`;
 
+    let session;
     if (sessionId) {
       // Update existing session
-      const session = await ChatSession.findByIdAndUpdate(
+      session = await ChatSession.findByIdAndUpdate(
         sessionId,
         { messages, updatedAt: new Date(), title: autoTitle },
         { new: true }
       );
-      if (!session) return res.status(404).json({ error: 'Session not found' });
-      return res.json(session);
     } else {
       // Create new session
-      const session = new ChatSession({
+      session = new ChatSession({
         username, subject, chapter, mode, title: autoTitle, messages
       });
       await session.save();
-      return res.json(session);
     }
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    // Invalidate the sessions list cache
+    const cacheKey = `student:chats:${username}`;
+    try {
+      await safeCache.del(cacheKey);
+      
+      // Cache this specific active session state for fast retrieval/persistence on refresh
+      const sessionCacheKey = `student:chats:active:${username}`;
+      await safeCache.set(sessionCacheKey, JSON.stringify(session), { EX: 1800 });
+    } catch (e) {
+      console.warn('RedVER cache error in saving chat session:', e.message);
+    }
+
+    return res.json(session);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -516,6 +542,25 @@ router.delete('/chat-sessions/:id', async (req, res) => {
   try {
     const session = await ChatSession.findByIdAndDelete(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    // Invalidate the sessions list cache
+    const cacheKey = `student:chats:${session.username}`;
+    try {
+      await safeCache.del(cacheKey);
+
+      // If it was the active chat, clear the active chat cache as well
+      const sessionCacheKey = `student:chats:active:${session.username}`;
+      const cachedSessionStr = await safeCache.get(sessionCacheKey);
+      if (cachedSessionStr) {
+        const cachedSession = JSON.parse(cachedSessionStr);
+        if (cachedSession._id === req.params.id) {
+          await safeCache.del(sessionCacheKey);
+        }
+      }
+    } catch (e) {
+      console.warn('RedVER cache error in deleting chat session:', e.message);
+    }
+
     return res.json({ message: 'Session deleted' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -589,6 +634,93 @@ router.delete('/flashcards/:id', async (req, res) => {
     if (!deleted) return res.status(404).json({ error: 'Flashcard not found.' });
     return res.json({ message: 'Flashcard deleted.' });
   } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 26. Track Strict Exam Mode Warnings (RedVER Cache)
+router.post('/exam/warning', async (req, res) => {
+  const { studentId, examId, durationMinutes } = req.body;
+  if (!studentId || !examId) {
+    return res.status(400).json({ error: 'studentId and examId are required.' });
+  }
+  const warningKey = `exam:warning:${studentId}:${examId}`;
+  try {
+    const currentWarnings = await safeCache.incr(warningKey);
+    
+    // On the first warning, set the key to expire when the exam ends (+10 mins buffer)
+    if (currentWarnings === 1) {
+      const expirySeconds = ((durationMinutes || 60) * 60) + 600;
+      await safeCache.expire(warningKey, expirySeconds);
+    }
+    
+    if (currentWarnings >= 3) {
+      return res.json({ action: 'AUTO_SUBMIT', warnings: currentWarnings });
+    }
+    return res.json({ action: 'WARN', warnings: currentWarnings });
+  } catch (error) {
+    console.error('RedVER warning tracking error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 27. Reset/Clear warning count for a new exam session
+router.post('/exam/warning/reset', async (req, res) => {
+  const { studentId, examId } = req.body;
+  if (!studentId || !examId) {
+    return res.status(400).json({ error: 'studentId and examId are required.' });
+  }
+  const warningKey = `exam:warning:${studentId}:${examId}`;
+  try {
+    await safeCache.del(warningKey);
+    return res.json({ success: true, warnings: 0 });
+  } catch (error) {
+    console.error('RedVER warning reset error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 28. Get active chat session cache (RedVER)
+router.get('/chat-sessions/active', async (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.status(400).json({ error: 'username query param required' });
+  try {
+    const sessionCacheKey = `student:chats:active:${username}`;
+    const cachedSession = await safeCache.get(sessionCacheKey);
+    if (cachedSession) {
+      return res.json(JSON.parse(cachedSession));
+    }
+    return res.json(null);
+  } catch (error) {
+    console.error('RedVER get active session error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 29. Set active chat session cache (RedVER)
+router.post('/chat-sessions/active', async (req, res) => {
+  const { username, session } = req.body;
+  if (!username || !session) return res.status(400).json({ error: 'username and session are required' });
+  try {
+    const sessionCacheKey = `student:chats:active:${username}`;
+    await safeCache.set(sessionCacheKey, JSON.stringify(session), { EX: 1800 });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('RedVER set active session error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 30. Clear active chat session cache (RedVER)
+router.post('/chat-sessions/active/clear', async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ error: 'username is required' });
+  try {
+    const sessionCacheKey = `student:chats:active:${username}`;
+    await safeCache.del(sessionCacheKey);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('RedVER clear active session error:', error.message);
     return res.status(500).json({ error: error.message });
   }
 });

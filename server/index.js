@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
+import { connectCache } from './config/cache.js';
 import aiRouter from './routes/ai.js';
 import studentRouter from './routes/student.js';
 import authRoutes from './routes/authRoutes.js';
@@ -85,6 +86,9 @@ const startServer = async () => {
   } catch (error) {
     console.error('Failed to connect to MongoDB, starting server in offline mode:', error.message);
   }
+
+  // Connect to RedVER cache server
+  await connectCache();
 
   app.listen(PORT, () => {
     console.log(`Backend Server running on port ${PORT}`);

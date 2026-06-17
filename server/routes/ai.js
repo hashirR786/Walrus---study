@@ -1,5 +1,6 @@
 import express from 'express';
 import Flashcard from '../models/Flashcard.js';
+import { safeCache } from '../config/cache.js';
 
 const router = express.Router();
 
@@ -127,6 +128,20 @@ router.post('/solve', async (req, res) => {
 ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
   `.trim();
 
+  // 1. Check RedVER Cache first
+  const cacheKey = `ai:doubt:${subject.toLowerCase().trim()}:${(chapter || 'unknown').toLowerCase().trim()}:${(mode || 'solve').toLowerCase().trim()}:${studentInput.toLowerCase().trim()}${studentAttempt ? ':' + studentAttempt.toLowerCase().trim() : ''}${chatHistory.length > 0 ? ':hist:' + JSON.stringify(chatHistory.slice(-2)) : ''}`;
+
+  try {
+    const cachedResponse = await safeCache.get(cacheKey);
+    if (cachedResponse) {
+      console.log('⚡ RedVER Cache Hit! Saving API tokens.');
+      const parsed = JSON.parse(cachedResponse);
+      return res.json({ ...parsed, cached: true });
+    }
+  } catch (err) {
+    console.error('RedVER read error for /solve:', err);
+  }
+
   // ── Try Gemini 1.5 Flash first ─────────────────────────────────────────────
   try {
     const reply = await callGeminiAPI(
@@ -136,7 +151,13 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       0.2
     );
     console.log('✅ Gemini answered successfully');
-    return res.json({ response: reply, model: 'gemini-1.5-flash' });
+    const successResponse = { response: reply, model: 'gemini-1.5-flash' };
+    try {
+      await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
+    } catch (e) {
+      console.warn('RedVER write error for /solve:', e.message);
+    }
+    return res.json(successResponse);
   } catch (geminiError) {
     console.warn('⚠️  Gemini failed, trying Groq fallback:', geminiError.message);
   }
@@ -150,7 +171,13 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     ];
     const reply = await callGroqAPI(messages);
     console.log('✅ Groq fallback answered successfully');
-    return res.json({ response: reply, model: 'groq-llama' });
+    const successResponse = { response: reply, model: 'groq-llama' };
+    try {
+      await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
+    } catch (e) {
+      console.warn('RedVER write error for /solve:', e.message);
+    }
+    return res.json(successResponse);
   } catch (groqError) {
     console.warn('⚠️  Groq also failed, returning static fallback:', groqError.message);
   }
@@ -658,6 +685,18 @@ router.post('/generate-notes', async (req, res) => {
     return res.status(400).json({ error: 'Subject and chapter are required.' });
   }
 
+  const cacheKey = `ai:notes:${subject.toLowerCase().trim()}:${chapter.toLowerCase().trim()}`;
+  try {
+    const cachedResponse = await safeCache.get(cacheKey);
+    if (cachedResponse) {
+      console.log('⚡ RedVER Cache Hit for Formula Sheet/Notes! Saving API tokens.');
+      const parsed = JSON.parse(cachedResponse);
+      return res.json({ ...parsed, cached: true });
+    }
+  } catch (err) {
+    console.error('RedVER read error for /generate-notes:', err);
+  }
+
   const prompt = `Generate a high-yield Formula Sheet and Revision Note for Grade 12/11 CBSE:
 Subject: ${subject}
 Chapter: ${chapter}
@@ -675,7 +714,13 @@ Include:
       { role: 'user', content: prompt }
     ], 0.2);
 
-    return res.json({ notes: notesText });
+    const successResponse = { notes: notesText };
+    try {
+      await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
+    } catch (e) {
+      console.warn('RedVER write error for /generate-notes:', e.message);
+    }
+    return res.json(successResponse);
   } catch (error) {
     console.warn('Groq notes connection failed, generating fallback notes:', error.message);
 

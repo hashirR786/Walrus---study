@@ -209,13 +209,23 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   };
 
-  const triggerViolation = (reason) => {
+  const triggerViolation = async (reason) => {
     if (!testActive) return;
-    setViolations(prev => {
-      const next = prev + 1;
-      if (next >= 3) {
+    try {
+      const res = await fetch(`${API_BASE}/student/exam/warning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: user?._id || 'anonymous',
+          examId: currentPaper?._id || currentPaper?.title || 'mock-exam',
+          durationMinutes: testDuration
+        })
+      });
+      const data = await res.json();
+      const next = data.warnings;
+
+      if (data.action === 'AUTO_SUBMIT' || next >= 3) {
         setIsTerminatedByStrict(true);
-        // Exit fullscreen
         if (document.exitFullscreen) {
           document.exitFullscreen().catch(e => {});
         } else if (document.webkitExitFullscreen) {
@@ -223,12 +233,32 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
         }
         setViolationWarning(null);
         handleSubmitTest();
-        return 0; // reset
+        setViolations(0);
       } else {
+        setViolations(next);
         setViolationWarning({ count: next, reason });
-        return next;
       }
-    });
+    } catch (err) {
+      console.warn("Failed to sync warnings with RedVER, falling back to local memory:", err.message);
+      // Fallback
+      setViolations(prev => {
+        const next = prev + 1;
+        if (next >= 3) {
+          setIsTerminatedByStrict(true);
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(e => {});
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          }
+          setViolationWarning(null);
+          handleSubmitTest();
+          return 0;
+        } else {
+          setViolationWarning({ count: next, reason });
+          return next;
+        }
+      });
+    }
   };
 
   // Strict mode event listeners
@@ -1024,12 +1054,24 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                 </button>
                 <button 
                   className="btn-primary" 
-                  onClick={() => {
+                  onClick={async () => {
                     setViolations(0);
                     setTimeLeft(testDuration * 60);
                     setTestActive(true);
                     if (strictMode) {
                       enterFullscreen();
+                      try {
+                        await fetch(`${API_BASE}/student/exam/warning/reset`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            studentId: user?._id || 'anonymous',
+                            examId: currentPaper?._id || currentPaper?.title || 'mock-exam'
+                          })
+                        });
+                      } catch (e) {
+                        console.warn("Could not reset warning count in RedVER:", e.message);
+                      }
                     }
                   }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
