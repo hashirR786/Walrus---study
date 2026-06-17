@@ -4,6 +4,9 @@ RedVER is an educational, production-ready, in-memory key-value database built e
 
 Built using **zero third-party dependencies**—leveraging only Python's standard library (`asyncio`, `socket`, `json`, etc.)—RedVER is designed for developers who want to study database internals, custom network protocol parsers, and event-driven architectures.
 
+> [!NOTE]
+> **Walrus App Integration**: While RedVER serves as the default cache server for **local development and testing** of the Walrus Study App, the cloud-hosted production deployment of Walrus connects to a serverless **Upstash Redis** database. This architecture is necessary due to Render Free Tier restrictions, which do not allow incoming private network traffic on Free Web Services. Because RedVER is fully Redis-compatible, this transition requires zero backend code changes!
+
 ---
 
 ## ✨ Features
