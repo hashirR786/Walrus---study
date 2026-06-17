@@ -3,6 +3,7 @@
 :root {
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-heading: 'Outfit', sans-serif;
+  --mobile-header-height: 53px;
 
   /* ----------------------------------------------------
      LIGHT MODE (Warm Sand / Alabaster Beige)
@@ -1202,6 +1203,10 @@ button.btn-secondary:hover {
   position: sticky;
   top: 0;
   z-index: 9;
+  box-sizing: border-box;
+  height: var(--mobile-header-height, 53px);
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, border-bottom-width 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .menu-toggle-btn {
@@ -1257,16 +1262,31 @@ button.btn-secondary:hover {
     left: 0;
   }
 
+  .app-container.mobile-header-hidden {
+    --mobile-header-height: 0px;
+  }
+
+  .app-container.mobile-header-hidden .mobile-header {
+    transform: translateY(-100%);
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-width: 0;
+    pointer-events: none;
+  }
+
   .main-content {
     margin-left: 0 !important;
     padding: 1rem;
-    height: calc(100vh - 53px);
-    height: calc(100dvh - 53px);
+    height: calc(100vh - var(--mobile-header-height, 53px));
+    height: calc(100dvh - var(--mobile-header-height, 53px));
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .main-content.chat-mode {
-    height: calc(100vh - 53px) !important;
-    height: calc(100dvh - 53px) !important;
+    height: calc(100vh - var(--mobile-header-height, 53px)) !important;
+    height: calc(100dvh - var(--mobile-header-height, 53px)) !important;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
 
   .glass-panel {
@@ -1429,6 +1449,28 @@ button.btn-secondary:hover {
   grid-template-columns: 1.1fr 1.9fr;
   gap: 1.5rem;
 }
+
+/* ----------------------------------------------------
+   RESPONSIVE COLLAPSIBLE SELECTORS FOR DOUBT SOLVER
+   ---------------------------------------------------- */
+.doubt-solver-grid {
+  display: none !important;
+}
+
+.doubt-solver-grid.show {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 1rem !important;
+  animation: pageEnter 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@media (max-width: 768px) {
+  .doubt-solver-grid.show {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+}
+
 
 
 

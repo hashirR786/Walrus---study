@@ -94,10 +94,15 @@ export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [accent, setAccent] = useState(localStorage.getItem('accent') || 'classic-slate');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [mobileHeaderHidden, setMobileHeaderHidden] = useState(false);
   
   const [progressData, setProgressData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    setMobileHeaderHidden(false);
+  }, [activeTab]);
 
   // Toast utility
   const addToast = (msg, type = 'success') => {
@@ -332,7 +337,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${mobileHeaderHidden ? 'mobile-header-hidden' : ''}`}>
       {/* Mobile Top Header */}
       <header className="mobile-header">
         <button className="menu-toggle-btn" onClick={() => setIsSidebarOpen(true)}>
@@ -383,6 +388,7 @@ export default function App() {
               onActivityTriggered={handleUpdateStudyTime}
               user={user}
               activeTab={activeTab}
+              onScrollDirectionChange={setMobileHeaderHidden}
             />
           </div>
 

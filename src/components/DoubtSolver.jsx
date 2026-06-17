@@ -38,7 +38,7 @@ const INITIAL_MESSAGE = {
   timestamp: new Date().toISOString()
 };
 
-export default function DoubtSolver({ progressData, onActivityTriggered, user, activeTab }) {
+export default function DoubtSolver({ progressData, onActivityTriggered, user, activeTab, onScrollDirectionChange }) {
   // Load cached active chat from localStorage if available
   const [activeChatCache] = useState(() => {
     try {
@@ -75,6 +75,8 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
   const [sessions, setSessions] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollY = useRef(0);
 
   // Keep ref in sync
   useEffect(() => {
@@ -197,6 +199,26 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     if (viewport) viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  const handleScroll = (e) => {
+    const currentScrollY = e.target.scrollTop;
+    if (currentScrollY < 50) {
+      setShowHeader(true);
+      if (onScrollDirectionChange) onScrollDirectionChange(false);
+      lastScrollY.current = currentScrollY;
+      return;
+    }
+    const diff = currentScrollY - lastScrollY.current;
+    if (Math.abs(diff) < 20) return;
+    if (diff > 0) {
+      setShowHeader(false);
+      if (onScrollDirectionChange) onScrollDirectionChange(true);
+    } else {
+      setShowHeader(true);
+      if (onScrollDirectionChange) onScrollDirectionChange(false);
+    }
+    lastScrollY.current = currentScrollY;
+  };
+
   // ── Start a brand-new session ───────────────────────────────────────────────
   const startNewSession = () => {
     currentSessionIdRef.current = null;
@@ -206,6 +228,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     setStudentAttempt('');
     setAttachedImage(null);
     setShowHistory(false);
+    setShowHeader(true);
 
     if (user?.username) {
       fetch(`${API_BASE}/student/chat-sessions/active/clear`, {
@@ -228,6 +251,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
       ...session.messages.map(m => ({ ...m }))
     ]);
     setShowHistory(false);
+    setShowHeader(true);
 
     if (user?.username) {
       fetch(`${API_BASE}/student/chat-sessions/active`, {
@@ -463,10 +487,23 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
       </div>
 
       {/* ── Main Chat Area ──────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
 
         {/* Header */}
-        <header style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: '0.75rem', flexShrink: 0, zIndex: 5 }}>
+        <header style={{ 
+          padding: showHeader ? '1rem 1.5rem' : '0 1.5rem', 
+          maxHeight: showHeader ? '180px' : '0px',
+          opacity: showHeader ? 1 : 0,
+          borderBottom: showHeader ? '1px solid var(--border-color)' : 'none', 
+          backgroundColor: 'var(--bg-card)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: showHeader ? '0.75rem' : '0px', 
+          flexShrink: 0, 
+          zIndex: 5,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflow: 'hidden'
+        }}>
           <div className="doubt-solver-header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.2rem' }}>
               <GraduationCap size={24} /> AI CBSE Tutor &amp; Doubt Solver
@@ -476,7 +513,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
               <button 
                 onClick={() => setShowFilters(f => !f)} 
                 className={`btn-secondary doubt-solver-settings-toggle-btn ${showFilters ? 'active' : ''}`}
-                style={{ display: 'none', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.4rem 0.85rem', borderColor: showFilters ? 'var(--primary)' : 'var(--border-color)', color: showFilters ? 'var(--primary)' : 'var(--text-primary)' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.4rem 0.85rem', borderColor: showFilters ? 'var(--primary)' : 'var(--border-color)', color: showFilters ? 'var(--primary)' : 'var(--text-primary)' }}
               >
                 <SlidersHorizontal size={14} /> Settings
               </button>
@@ -495,7 +532,15 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
             </div>
           </div>
 
-          <div className={`doubt-solver-grid ${showFilters ? 'show' : ''}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          {!showFilters && (
+            <div className="doubt-solver-badges-row animate-fade-in" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '-0.1rem' }}>
+              <span className="badge badge-primary" style={{ fontSize: '0.72rem', padding: '0.2rem 0.65rem', fontWeight: 600 }}>{subject}</span>
+              <span className="badge badge-success" style={{ fontSize: '0.72rem', padding: '0.2rem 0.65rem', fontWeight: 600 }}>{chapter}</span>
+              <span className="badge badge-warning" style={{ fontSize: '0.72rem', padding: '0.2rem 0.65rem', fontWeight: 600 }}>{mode}</span>
+            </div>
+          )}
+
+          <div className={`doubt-solver-grid ${showFilters ? 'show' : ''}`}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Subject</label>
               <select className="input-control" style={{ padding: '0.45rem 0.7rem', fontSize: '0.88rem', height: '2.1rem', backgroundColor: 'var(--bg-app)' }}
@@ -523,7 +568,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
         </header>
 
         {/* Messages */}
-        <div className="chat-messages-viewport" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="chat-messages-viewport" onScroll={handleScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '2rem 1.5rem 150px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ width: '100%', maxWidth: '850px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {messages.map((msg, index) => (
               <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', width: '100%' }}>
@@ -559,8 +604,18 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
         </div>
 
         {/* Input area */}
-        <footer style={{ padding: '1rem 1.5rem 1.5rem', backgroundColor: 'var(--bg-app)', borderTop: '1px solid var(--border-color)', flexShrink: 0 }}>
-          <div style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
+        <footer style={{ 
+          position: 'absolute', 
+          bottom: 0, 
+          left: 0, 
+          right: 0, 
+          padding: '0.5rem 1.5rem 1.5rem', 
+          backgroundColor: 'transparent', 
+          borderTop: 'none', 
+          zIndex: 10,
+          pointerEvents: 'none' 
+        }}>
+          <div style={{ width: '100%', maxWidth: '850px', margin: '0 auto', pointerEvents: 'auto' }}>
             {(attachedImage || isOcrRunning) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.65rem 1rem', marginBottom: '0.65rem' }}>
                 {attachedImage && (
@@ -583,26 +638,41 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
             <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
 
             <form onSubmit={handleSendMessage} onPaste={handlePaste}
-              style={{ borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', padding: '0.65rem 1rem', display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-
-              <button type="button" className="btn-secondary"
-                style={{ padding: '0.6rem', borderRadius: '50%', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                onClick={() => fileInputRef.current.click()} title="Upload question image">
-                <ImageIcon size={16} />
-              </button>
+              style={{ 
+                borderRadius: mode === 'Why am I wrong' ? '24px' : '9999px', 
+                boxShadow: 'var(--shadow-md)', 
+                border: '1px solid var(--border-color)', 
+                backgroundColor: 'var(--bg-card)', 
+                padding: '0.35rem 0.5rem 0.35rem 0.75rem', 
+                display: 'flex', 
+                gap: '0.5rem', 
+                alignItems: 'center' 
+              }}>
 
               <button type="button"
-                className={`btn-secondary mic-btn ${isRecording ? 'recording' : ''}`}
-                style={{ padding: '0.6rem', borderRadius: '50%', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading || isTranscribing}
-                title={isRecording ? 'Stop recording' : 'Speak your doubt'}>
-                {isTranscribing ? <RefreshCw className="animate-spin" size={16} /> : isRecording ? <MicOff size={16} style={{ color: 'var(--danger)' }} /> : <Mic size={16} />}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--text-secondary)', 
+                  cursor: 'pointer',
+                  width: '34px', 
+                  height: '34px', 
+                  borderRadius: '50%',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  flexShrink: 0,
+                  transition: 'background-color 0.2s' 
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-light)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                onClick={() => fileInputRef.current.click()} title="Upload question image">
+                <Plus size={20} />
               </button>
 
               <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.25rem' }}>
                 <input type="text" className="input-control"
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.93rem', border: 'none', backgroundColor: 'transparent', boxShadow: 'none' }}
+                  style={{ width: '100%', padding: '0.5rem 0.25rem', fontSize: '0.93rem', border: 'none', backgroundColor: 'transparent', boxShadow: 'none' }}
                   onPaste={handlePaste}
                   placeholder={isRecording ? '🔴 Recording… click mic to stop.' : isTranscribing ? '✍️ Transcribing…' : mode === 'Why am I wrong' ? 'Paste the question here…' : 'Type your doubt or question…'}
                   value={studentInput}
@@ -611,7 +681,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
                 />
                 {mode === 'Why am I wrong' && (
                   <input type="text" className="input-control"
-                    style={{ width: '100%', padding: '0.4rem 0.75rem', fontSize: '0.82rem', border: 'none', borderTop: '1px solid var(--border-color)', backgroundColor: 'transparent', boxShadow: 'none' }}
+                    style={{ width: '100%', padding: '0.4rem 0.25rem', fontSize: '0.82rem', border: 'none', borderTop: '1px solid var(--border-color)', backgroundColor: 'transparent', boxShadow: 'none' }}
                     placeholder="Optionally paste your attempted answer to analyze mistakes…"
                     value={studentAttempt}
                     onChange={e => setStudentAttempt(e.target.value)}
@@ -620,17 +690,45 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
                 )}
               </div>
 
+              <button type="button"
+                className={`mic-btn ${isRecording ? 'recording' : ''}`}
+                style={{ 
+                  background: isRecording ? 'var(--danger-light)' : 'none', 
+                  border: 'none', 
+                  color: isRecording ? 'var(--danger)' : 'var(--text-secondary)', 
+                  cursor: 'pointer',
+                  width: '34px', 
+                  height: '34px', 
+                  borderRadius: '50%',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  flexShrink: 0,
+                  transition: 'background-color 0.2s' 
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = isRecording ? 'var(--danger-light)' : 'var(--primary-light)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = isRecording ? 'var(--danger-light)' : 'transparent'}
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading || isTranscribing}
+                title={isRecording ? 'Stop recording' : 'Speak your doubt'}>
+                {isTranscribing ? <RefreshCw className="animate-spin" size={15} /> : isRecording ? <MicOff size={17} /> : <Mic size={17} />}
+              </button>
+
               <button type="submit" className="btn-primary"
-                style={{ padding: '0.6rem 1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)', height: '38px', flexShrink: 0 }}
+                style={{ 
+                  width: '34px', 
+                  height: '34px', 
+                  borderRadius: '50%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  flexShrink: 0,
+                  padding: 0 
+                }}
                 disabled={isLoading || !studentInput.trim()}>
-                <Send size={15} />
+                <Send size={14} />
               </button>
             </form>
-
-            <div style={{ textAlign: 'center', fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-              Walrus CBSE Tutor can make mistakes. Verify critical NCERT formulas and guidelines.
-              {user && <span style={{ marginLeft: '0.5rem', color: 'var(--primary)', fontWeight: 500 }}>· Sessions saved to your account</span>}
-            </div>
           </div>
         </footer>
       </div>
