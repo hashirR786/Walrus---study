@@ -1,26 +1,52 @@
 import { createClient } from 'redis';
 
+let isCacheConnected = false;
+
 // Connect to RedVER on standard Redis port 6379
 const cache = createClient({
-  url: process.env.REDIS_URL || 'redis://127.0.0.1:6379'
+  url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+  socket: {
+    reconnectStrategy: (retries) => {
+      // Limit reconnect attempts to 5 to avoid infinite loops and log spam in cloud production (Render)
+      if (retries > 5) {
+        return false; // stops reconnecting
+      }
+      return 5000; // retry every 5 seconds
+    }
+  }
+});
+
+cache.on('connect', () => {
+  isCacheConnected = true;
+  console.log('⚡ Connected to RedVER Cache Server (Redis Compatible)');
+});
+
+cache.on('ready', () => {
+  isCacheConnected = true;
+});
+
+cache.on('end', () => {
+  isCacheConnected = false;
+  console.log('🔌 RedVER Cache connection closed.');
 });
 
 cache.on('error', (err) => {
-  // Suppress repeated logs if connection fails
+  isCacheConnected = false;
+  // Only log cache errors in non-production environments to avoid log spam in cloud hosting
   if (process.env.NODE_ENV !== 'production') {
     console.warn('RedVER Cache Error:', err.message);
   }
 });
 
-let isCacheConnected = false;
-
 const connectCache = async () => {
   try {
+    // Initiate connection. If it fails, the catch block captures it, 
+    // and the reconnectStrategy limits further attempts.
     await cache.connect();
-    isCacheConnected = true;
-    console.log('⚡ Connected to RedVER Cache Server (Redis Compatible)');
   } catch (err) {
-    console.warn('⚠️ Failed to connect to RedVER Cache on 127.0.0.1:6379. Running without cache.');
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('⚠️ Failed to connect to RedVER Cache on startup:', err.message);
+    }
     isCacheConnected = false;
   }
 };

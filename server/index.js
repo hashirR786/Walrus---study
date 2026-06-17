@@ -87,8 +87,8 @@ const startServer = async () => {
     console.error('Failed to connect to MongoDB, starting server in offline mode:', error.message);
   }
 
-  // Connect to RedVER cache server
-  await connectCache();
+  // Connect to RedVER cache server (non-blocking background task)
+  connectCache();
 
   app.listen(PORT, () => {
     console.log(`Backend Server running on port ${PORT}`);
