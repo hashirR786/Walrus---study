@@ -32,10 +32,7 @@ cache.on('end', () => {
 
 cache.on('error', (err) => {
   isCacheConnected = false;
-  // Only log cache errors in non-production environments to avoid log spam in cloud hosting
-  if (process.env.NODE_ENV !== 'production') {
-    console.warn('RedVER Cache Error:', err.message);
-  }
+  console.warn('RedVER Cache Error:', err.message);
 });
 
 const connectCache = async () => {
@@ -44,9 +41,7 @@ const connectCache = async () => {
     // and the reconnectStrategy limits further attempts.
     await cache.connect();
   } catch (err) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('⚠️ Failed to connect to RedVER Cache on startup:', err.message);
-    }
+    console.warn('⚠️ Failed to connect to RedVER Cache on startup:', err.message);
     isCacheConnected = false;
   }
 };
