@@ -492,7 +492,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
         {/* Header */}
         <header style={{ 
           padding: showHeader ? '1rem 1.5rem' : '0 1.5rem', 
-          maxHeight: showHeader ? '180px' : '0px',
+          maxHeight: showHeader ? (showFilters ? '550px' : '220px') : '0px',
           opacity: showHeader ? 1 : 0,
           borderBottom: showHeader ? '1px solid var(--border-color)' : 'none', 
           backgroundColor: 'var(--bg-card)', 
