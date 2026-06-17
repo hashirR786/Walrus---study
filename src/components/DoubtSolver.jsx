@@ -576,15 +576,20 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
                   {msg.role === 'ai' ? '🎓 CBSE Tutor Core' : (user?.username || 'Student')}
                   {msg.timestamp && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.35rem' }}>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                 </div>
-                <div className="markdown-body" style={{
+                <div className="markdown-body" style={msg.role === 'user' ? {
                   width: '100%', padding: '1.1rem 1.4rem',
-                  backgroundColor: msg.role === 'user' ? 'var(--primary-light)' : 'var(--bg-card)',
-                  color: msg.role === 'ai' ? 'var(--ai-text-primary)' : 'var(--text-primary)',
+                  backgroundColor: 'var(--primary-light)',
+                  color: 'var(--text-primary)',
                   borderRadius: 'var(--radius-lg)',
                   border: '1px solid var(--border-color)',
-                  borderBottomRightRadius: msg.role === 'user' ? '2px' : 'var(--radius-lg)',
-                  borderBottomLeftRadius: msg.role === 'ai' ? '2px' : 'var(--radius-lg)',
+                  borderBottomRightRadius: '2px',
                   boxShadow: 'var(--shadow-sm)', lineHeight: '1.6'
+                } : {
+                  width: '100%', padding: '0.5rem 0',
+                  backgroundColor: 'transparent',
+                  color: 'var(--ai-text-primary)',
+                  border: 'none',
+                  boxShadow: 'none', lineHeight: '1.6'
                 }}>
                   <MarkdownRenderer content={msg.content} isAi={msg.role === 'ai'} />
                 </div>
@@ -593,7 +598,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
             {isLoading && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
                 <div style={{ fontSize: '0.73rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>🎓 CBSE Tutor Core</div>
-                <div style={{ padding: '1.1rem 1.4rem', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', borderBottomLeftRadius: '2px', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                <div style={{ padding: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
                   <RefreshCw className="animate-spin" size={16} />
                   <span>Thinking based on NCERT syllabus guidelines…</span>
                 </div>
