@@ -65,7 +65,7 @@ Ask doubts, take mock exams, review flashcards, track your syllabus, and collabo
 <summary><b>🤖 AI Doubt Solver</b></summary>
 <br/>
 
-- Chat with a **CBSE-specialized AI tutor** powered by Google Gemini (upgraded to `gemini-2.5-flash`)
+- Chat with a **CBSE-specialized AI tutor** powered by Google Gemini
 - Understands subject context (Physics, Chemistry, Maths, Biology, Economics)
 - Beautifully rendered **LaTeX equations** and **Markdown** responses
 - Caches responses in **Redis** (Upstash in cloud, custom RedVER engine locally) for instant `<3ms` hits
