@@ -454,15 +454,54 @@ router.post('/studyroom/messages', async (req, res) => {
   }
 });
 
-// 18. Get online study room users (registered users)
-router.get('/studyroom/users', async (req, res) => {
+// 18. Heartbeat — called every ~20s by the frontend to mark user as online in study room
+router.post('/studyroom/heartbeat', async (req, res) => {
+  const { username, status, focusSubject } = req.body;
+  if (!username) return res.status(400).json({ error: 'username is required' });
   try {
-    const users = await User.find({}, 'username focusCategory avatar');
-    return res.json(users);
+    // Key expires after 35 seconds — if client misses 1 ping it will still appear, but 2 misses = offline
+    const presenceKey = `presence:studyroom:${username}`;
+    const payload = JSON.stringify({ username, status: status || 'Studying', focusSubject: focusSubject || 'General', lastSeen: Date.now() });
+    await safeCache.setEx(presenceKey, 35, payload);
+    return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// 18b. Leave — explicitly remove presence key when user leaves the study room
+router.post('/studyroom/leave', async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ error: 'username is required' });
+  try {
+    await safeCache.del(`presence:studyroom:${username}`);
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 19. Get ONLY concurrently online study room users (via Redis presence keys)
+router.get('/studyroom/users', async (req, res) => {
+  try {
+    const presenceKeys = await safeCache.keys('presence:studyroom:*');
+    if (!presenceKeys || presenceKeys.length === 0) {
+      return res.json([]);
+    }
+    // Parse each presence record stored in Redis
+    const peers = [];
+    for (const key of presenceKeys) {
+      try {
+        const raw = await safeCache.get(key);
+        if (raw) peers.push(JSON.parse(raw));
+      } catch { /* skip malformed */ }
+    }
+    return res.json(peers);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 
 // 19. Get all chat sessions for a student (most recent first)
 router.get('/chat-sessions', async (req, res) => {

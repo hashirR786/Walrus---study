@@ -93,6 +93,24 @@ const safeCache = {
       return null;
     }
   },
+  setEx: async (key, seconds, value) => {
+    if (!isCacheConnected) return null;
+    try {
+      return await cache.setEx(key, seconds, value);
+    } catch (err) {
+      console.warn('Cache setEx error:', err.message);
+      return null;
+    }
+  },
+  keys: async (pattern) => {
+    if (!isCacheConnected) return [];
+    try {
+      return await cache.keys(pattern);
+    } catch (err) {
+      console.warn('Cache keys error:', err.message);
+      return [];
+    }
+  },
   isConnected: () => isCacheConnected
 };
 

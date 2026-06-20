@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, MessageSquare, Link as LinkIcon, ThumbsUp, Send, Library, Trash2, X, AlertTriangle, Download, ZoomIn } from 'lucide-react';
 import { API_BASE } from '../config';
 
@@ -62,6 +62,10 @@ export default function Community({ progressData, user }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [newMessageText, setNewMessageText] = useState('');
+  const [myStatus, setMyStatus] = useState('Studying');
+  const [mySubject, setMySubject] = useState('Physics');
+  // Ref to always have fresh status/subject inside setInterval closures
+  const presenceRef = useRef({ status: 'Studying', subject: 'Physics', username: user?.username });
 
   // Inline confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm }
@@ -76,6 +80,11 @@ export default function Community({ progressData, user }) {
     setConfirmDialog({ message, onConfirm });
   };
   const dismissConfirm = () => setConfirmDialog(null);
+
+  // Keep presenceRef.username up to date with the user prop
+  useEffect(() => {
+    presenceRef.current = { ...presenceRef.current, username: user?.username };
+  }, [user]);
 
   // Sync Timer
   useEffect(() => {
@@ -93,10 +102,23 @@ export default function Community({ progressData, user }) {
     if (activeTab === 'forum') fetchThreads();
     else if (activeTab === 'notes') fetchNotes();
     else if (activeTab === 'study-room') {
+      // Immediately register presence & load
+      sendHeartbeat();
       fetchOnlineUsers();
       fetchMessages();
-      const interval = setInterval(fetchMessages, 5000);
-      return () => clearInterval(interval);
+
+      // Refresh peers every 15s, messages every 5s, heartbeat every 20s
+      const peersInterval = setInterval(fetchOnlineUsers, 15000);
+      const msgInterval = setInterval(fetchMessages, 5000);
+      const heartbeatInterval = setInterval(sendHeartbeat, 20000);
+
+      return () => {
+        clearInterval(peersInterval);
+        clearInterval(msgInterval);
+        clearInterval(heartbeatInterval);
+        // Explicitly mark as offline when leaving the tab
+        leaveRoom();
+      };
     }
   }, [activeTab]);
 
@@ -238,6 +260,29 @@ export default function Community({ progressData, user }) {
   };
 
   // ── Study Room ───────────────────────────────────────────────────────────────
+  const sendHeartbeat = async () => {
+    const { username, status, subject } = presenceRef.current;
+    if (!username) return;
+    try {
+      await fetch(`${API_BASE}/student/studyroom/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, status, focusSubject: subject })
+      });
+    } catch { /* offline */ }
+  };
+
+  const leaveRoom = async () => {
+    if (!user?.username) return;
+    try {
+      await fetch(`${API_BASE}/student/studyroom/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username })
+      });
+    } catch { /* offline */ }
+  };
+
   const fetchOnlineUsers = async () => {
     try {
       const res = await fetch(`${API_BASE}/student/studyroom/users`);
@@ -510,38 +555,124 @@ export default function Community({ progressData, user }) {
       {/* ── STUDY ROOM ── */}
       {activeTab === 'study-room' && (
         <div className="community-room-grid">
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', height: 'fit-content' }}>
-            <Library size={36} style={{ color: 'var(--primary)', marginBottom: '0.5rem' }} />
-            <h3>Virtual Study Room</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Synchronized Pomodoro timer with peers!</p>
-            <div className="pomodoro-dial active" style={{ width: '150px', height: '150px', fontSize: '2rem' }}>{formatTimer(roomTimer)}</div>
-            <button className="btn-secondary" style={{ marginTop: '1.5rem' }} onClick={() => setTimerRunning(p => !p)}>
-              {timerRunning ? 'Pause Session' : 'Resume Session'}
-            </button>
+          {/* Left: Pomodoro + My Status */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <Library size={36} style={{ color: 'var(--primary)', marginBottom: '0.5rem' }} />
+              <h3>Virtual Study Room</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Synchronized Pomodoro timer with peers!</p>
+              <div className="pomodoro-dial active" style={{ width: '150px', height: '150px', fontSize: '2rem' }}>{formatTimer(roomTimer)}</div>
+              <button className="btn-secondary" style={{ marginTop: '1.5rem' }} onClick={() => setTimerRunning(p => !p)}>
+                {timerRunning ? 'Pause Session' : 'Resume Session'}
+              </button>
+            </div>
+
+            {/* My Status Card */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>My Presence</h4>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Status</label>
+                <select className="input-control" style={{ padding: '0.4rem' }} value={myStatus} onChange={e => {
+                  const v = e.target.value;
+                  setMyStatus(v);
+                  presenceRef.current = { ...presenceRef.current, status: v };
+                  sendHeartbeat();
+                }}>
+                  {statuses.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Studying</label>
+                <select className="input-control" style={{ padding: '0.4rem' }} value={mySubject} onChange={e => {
+                  const v = e.target.value;
+                  setMySubject(v);
+                  presenceRef.current = { ...presenceRef.current, subject: v };
+                  sendHeartbeat();
+                }}>
+                  {subjects.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 0 3px rgba(34,197,94,0.25)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#22c55e' }}>You are online</span>
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Active Peers Panel */}
             <div className="card">
-              <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--success)', display: 'inline-block' }} />
-                Active Peers ({onlineUsers.length})
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '180px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 0 3px rgba(34,197,94,0.25)', display: 'inline-block' }} />
+                  Live Peers
+                </h3>
+                <span style={{
+                  fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.65rem',
+                  borderRadius: '999px', backgroundColor: onlineUsers.length > 0 ? 'rgba(34,197,94,0.15)' : 'var(--bg-app)',
+                  color: onlineUsers.length > 0 ? '#22c55e' : 'var(--text-muted)',
+                  border: `1px solid ${onlineUsers.length > 0 ? 'rgba(34,197,94,0.3)' : 'var(--border-color)'}`
+                }}>
+                  {onlineUsers.length} online
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '260px', overflowY: 'auto' }}>
                 {onlineUsers.length > 0 ? onlineUsers.map((peer, idx) => {
                   const isMe = peer.username === user?.username;
+                  const initials = peer.username ? peer.username.slice(0, 2).toUpperCase() : '??';
+                  const avatarColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#14b8a6','#3b82f6','#ef4444'];
+                  const color = avatarColors[peer.username.charCodeAt(0) % avatarColors.length];
+                  const subjectColors = { Physics: '#6366f1', Chemistry: '#10b981', Mathematics: '#f59e0b', Biology: '#22c55e', Economics: '#3b82f6', General: '#94a3b8' };
+                  const subjectColor = subjectColors[peer.focusSubject] || '#94a3b8';
                   return (
-                    <div key={peer._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: isMe ? 'var(--primary-light)' : 'var(--bg-app)' }}>
-                      <div>
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>{peer.username}{isMe ? ' (You)' : ''}</h4>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Focus: {subjects[idx % subjects.length]}</span>
+                    <div key={peer.username || idx} style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      padding: '0.65rem 0.85rem',
+                      border: `1px solid ${isMe ? 'rgba(99,102,241,0.35)' : 'var(--border-color)'}`,
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: isMe ? 'rgba(99,102,241,0.07)' : 'var(--bg-app)',
+                      transition: 'all 0.2s'
+                    }}>
+                      {/* Avatar with online ring */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={{
+                          width: '38px', height: '38px', borderRadius: '50%',
+                          backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.85rem', fontWeight: 700, color: '#fff',
+                          boxShadow: `0 0 0 2.5px var(--bg-card), 0 0 0 4.5px #22c55e`
+                        }}>{initials}</div>
+                        {/* Animated pulse for online */}
+                        <span style={{
+                          position: 'absolute', bottom: '1px', right: '1px',
+                          width: '10px', height: '10px', borderRadius: '50%',
+                          backgroundColor: '#22c55e', border: '2px solid var(--bg-card)'
+                        }} />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--success)' }} />
-                        <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--success)' }}>{statuses[idx % statuses.length]}</span>
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{peer.username}</span>
+                          {isMe && <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: '999px', background: 'rgba(99,102,241,0.15)', color: 'var(--primary)', fontWeight: 700 }}>You</span>}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{peer.status || 'Studying'}</span>
                       </div>
+                      {/* Subject badge */}
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.55rem',
+                        borderRadius: '999px', whiteSpace: 'nowrap',
+                        backgroundColor: `${subjectColor}18`,
+                        color: subjectColor,
+                        border: `1px solid ${subjectColor}40`
+                      }}>{peer.focusSubject || 'General'}</span>
                     </div>
                   );
-                }) : <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No peers online yet</p>}
+                }) : (
+                  <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🦭</div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 500 }}>You're the first one here!</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: '0.25rem 0 0' }}>Peers will appear when they join the Study Room.</p>
+                  </div>
+                )}
               </div>
             </div>
 
