@@ -7,7 +7,7 @@ import {
 import MarkdownRenderer from './MarkdownRenderer';
 import { API_BASE } from '../config';
 
-const SUBJECTS_LIST = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics'];
+const SUBJECTS_LIST = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
 const getChaptersForSubject = (subj, progressData) => {
   const defaultList = ['All Chapters'];
@@ -26,7 +26,20 @@ const getChaptersForSubject = (subj, progressData) => {
     Chemistry: ['Solutions','Electrochemistry','Chemical Kinetics','Coordination Compounds','Haloalkanes and Haloarenes','Alcohols, Phenols and Ethers','Biomolecules'],
     Mathematics: ['Relations and Functions','Matrices','Continuity and Differentiability','Integrals','Probability'],
     Biology: ['Sexual Reproduction in Flowering Plants','Human Reproduction','Reproductive Health','Principles of Inheritance and Variation'],
-    Economics: ['Introduction to Macroeconomics & National Income Accounting','Money and Banking','Government Budget and the Economy']
+    Economics: ['Introduction to Macroeconomics & National Income Accounting','Money and Banking','Government Budget and the Economy'],
+    'Computer Science': [
+      'Exception Handling',
+      'File Handling',
+      'Stack',
+      'Queue',
+      'Searching',
+      'Sorting',
+      'Database Concepts',
+      'Structured Query Language (SQL)',
+      'Computer Networks',
+      'Data Communication and Network Security',
+      'Interface Python with SQL (MySQL Connectivity)'
+    ]
   };
 
   return [...defaultList, ...(fallbackMap[subj] || [])];

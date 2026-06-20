@@ -72,7 +72,7 @@ export default function Community({ progressData, user }) {
   // Lightbox
   const [lightboxImage, setLightboxImage] = useState(null); // { src, title }
 
-  const subjects = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics'];
+  const subjects = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
   const statuses = ['Studying', 'Solving PYQs', 'Reading Cheatsheet', 'Reviewing Syllabus', 'Revising notes'];
 
   // Helper: show inline confirmation instead of window.confirm
@@ -364,7 +364,7 @@ export default function Community({ progressData, user }) {
                   value={newThreadContent} onChange={e => setNewThreadContent(e.target.value)} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <select className="input-control" style={{ padding: '0.4rem' }} value={newThreadSubject} onChange={e => setNewThreadSubject(e.target.value)}>
-                    {['Physics','Chemistry','Mathematics','Biology','Economics'].map(s => <option key={s}>{s}</option>)}
+                    {['Physics','Chemistry','Mathematics','Biology','Economics','Computer Science'].map(s => <option key={s}>{s}</option>)}
                   </select>
                   <button type="submit" className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Ask Doubt</button>
                 </div>
@@ -463,7 +463,7 @@ export default function Community({ progressData, user }) {
                 { label: 'Note Title *', el: <input type="text" className="input-control" placeholder="e.g. Wave Optics Notes" required value={newNoteTitle} onChange={e => setNewNoteTitle(e.target.value)} /> },
                 { label: 'Subject *', el: (
                   <select className="input-control" value={newNoteSubject} onChange={e => setNewNoteSubject(e.target.value)}>
-                    {['Physics','Chemistry','Mathematics','Biology','Economics'].map(s => <option key={s}>{s}</option>)}
+                    {['Physics','Chemistry','Mathematics','Biology','Economics','Computer Science'].map(s => <option key={s}>{s}</option>)}
                   </select>
                 )},
                 { label: 'Description', el: <textarea className="input-control" rows={2} placeholder="What do these notes cover?" value={newNoteDescription} onChange={e => setNewNoteDescription(e.target.value)} /> },
@@ -622,7 +622,7 @@ export default function Community({ progressData, user }) {
                   const initials = peer.username ? peer.username.slice(0, 2).toUpperCase() : '??';
                   const avatarColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#14b8a6','#3b82f6','#ef4444'];
                   const color = avatarColors[peer.username.charCodeAt(0) % avatarColors.length];
-                  const subjectColors = { Physics: '#6366f1', Chemistry: '#10b981', Mathematics: '#f59e0b', Biology: '#22c55e', Economics: '#3b82f6', General: '#94a3b8' };
+                  const subjectColors = { Physics: '#6366f1', Chemistry: '#10b981', Mathematics: '#f59e0b', Biology: '#22c55e', Economics: '#3b82f6', 'Computer Science': '#f97316', General: '#94a3b8' };
                   const subjectColor = subjectColors[peer.focusSubject] || '#94a3b8';
                   return (
                     <div key={peer.username || idx} style={{

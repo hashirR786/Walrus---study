@@ -4,14 +4,27 @@ import MarkdownRenderer from './MarkdownRenderer';
 
 import { API_BASE } from '../config';
 
-const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics'];
+const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
 const CHAPTERS_PRESET = {
   Physics: ['Electric Charges and Fields', 'Electrostatic Potential and Capacitance', 'Current Electricity', 'Moving Charges and Magnetism', 'Magnetism and Matter', 'Ray Optics and Wave Optics'],
   Chemistry: ['Solutions', 'Electrochemistry', 'Chemical Kinetics', 'Coordination Compounds'],
   Mathematics: ['Relations and Functions', 'Matrices', 'Continuity and Differentiability', 'Integrals'],
   Biology: ['Human Reproduction', 'Principles of Inheritance', 'Molecular Basis of Inheritance'],
-  Economics: ['National Income Accounting', 'Money and Banking', 'Government Budget']
+  Economics: ['National Income Accounting', 'Money and Banking', 'Government Budget'],
+  'Computer Science': [
+    'Exception Handling',
+    'File Handling',
+    'Stack',
+    'Queue',
+    'Searching',
+    'Sorting',
+    'Database Concepts',
+    'Structured Query Language (SQL)',
+    'Computer Networks',
+    'Data Communication and Network Security',
+    'Interface Python with SQL (MySQL Connectivity)'
+  ]
 };
 
 export default function Resources({ onActivityTriggered }) {

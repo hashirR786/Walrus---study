@@ -3,7 +3,7 @@ import { GraduationCap, Timer, Award, Layers, CheckCircle2, AlertTriangle, BookO
 import MarkdownRenderer from './MarkdownRenderer';
 import { API_BASE } from '../config';
 
-const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics'];
+const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
 const CHAPTERS_PRESET = {
   Physics: [
@@ -45,6 +45,11 @@ const CHAPTERS_PRESET = {
     'Balance of Payments', 'Introduction to Microeconomics',
     'Consumer Equilibrium and Demand', 'Producer Behaviour and Supply',
     'Forms of Market and Price Determination'
+  ],
+  'Computer Science': [
+    'Exception Handling', 'File Handling', 'Stack', 'Queue', 'Searching', 'Sorting',
+    'Database Concepts', 'Structured Query Language (SQL)', 'Computer Networks',
+    'Data Communication and Network Security', 'Interface Python with SQL (MySQL Connectivity)'
   ]
 };
 
@@ -67,6 +72,10 @@ const SEEDED_FLASHCARDS = {
   ],
   Economics: [
     { q: "Define double counting in GDP estimation.", a: "Counting the value of the same product more than once by including intermediate goods alongside final goods." }
+  ],
+  'Computer Science': [
+    { q: "What is the difference between a list and a tuple in Python?", a: "Lists are mutable (can be changed after creation), whereas tuples are immutable (cannot be changed). Lists are defined using square brackets `[]` and tuples using parentheses `()`." },
+    { q: "Explain the concept of inheritance in Object-Oriented Programming.", a: "Inheritance is a mechanism where a new class (derived/subclass) inherits the attributes and methods of an existing class (base/superclass), promoting code reusability." }
   ]
 };
 

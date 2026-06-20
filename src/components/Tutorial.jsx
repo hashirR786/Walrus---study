@@ -59,7 +59,7 @@ export default function Tutorial({ setActiveTab, user }) {
       id: 'syllabus-tracker',
       title: '📋 Syllabus Tracker',
       subtitle: 'Stay on top of your CBSE Board Exam syllabus',
-      description: 'Monitor your completion across Physics, Chemistry, Maths, Biology, and Economics.',
+      description: 'Monitor your completion across Physics, Chemistry, Mathematics, Biology, Economics, and Computer Science.',
       icon: CheckSquare,
       color: 'var(--success)',
       proTips: [
@@ -109,7 +109,7 @@ export default function Tutorial({ setActiveTab, user }) {
       color: '#4f46e5',
       proTips: [
         '📅 Study Time: View chart summaries of study duration patterns.',
-        '🕸️ Coverage Map: Compare chapter statuses across all 5 key subjects.',
+        '🕸️ Coverage Map: Compare chapter statuses across all 6 key subjects.',
         '💡 Data Focus: Identify subjects that require more time or practice.'
       ],
       ctaText: 'View Dashboard',

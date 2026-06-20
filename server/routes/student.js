@@ -94,6 +94,22 @@ const DEFAULT_SYLLABUS = [
       { chapterName: 'Current Challenges facing Indian Economy', status: 'Todo', masteryScore: 0 },
       { chapterName: 'Development Experience of India: A Comparison with Neighbours', status: 'Todo', masteryScore: 0 }
     ]
+  },
+  {
+    subjectName: 'Computer Science',
+    chapters: [
+      { chapterName: 'Exception Handling', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'File Handling', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Stack', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Queue', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Searching', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Sorting', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Database Concepts', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Structured Query Language (SQL)', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Computer Networks', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Data Communication and Network Security', status: 'Todo', masteryScore: 0 },
+      { chapterName: 'Interface Python with SQL (MySQL Connectivity)', status: 'Todo', masteryScore: 0 }
+    ]
   }
 ];
 
