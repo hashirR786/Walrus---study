@@ -588,40 +588,70 @@ button.btn-secondary:hover {
    ---------------------------------------------------- */
 .heatmap-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(16px, 1fr));
+  gap: 6px;
   padding: 1rem 0;
 }
 
 .heatmap-cell {
   aspect-ratio: 1;
-  border-radius: 3px;
+  border-radius: 4px;
   cursor: pointer;
   position: relative;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
 }
 
-.heatmap-cell.todo { background-color: var(--bg-card-hover); }
-.heatmap-cell.inprogress { background-color: var(--warning); opacity: 0.6; }
-.heatmap-cell.completed { background-color: var(--success); }
+.heatmap-cell.todo { 
+  background-color: var(--bg-card-hover); 
+  border-color: var(--border-color);
+}
+
+.heatmap-cell.inprogress { 
+  background-color: var(--warning); 
+  box-shadow: 0 0 4px rgba(217, 159, 89, 0.2);
+}
+
+.heatmap-cell.completed { 
+  background-color: var(--success); 
+  box-shadow: 0 0 4px rgba(95, 117, 96, 0.2);
+}
+
+.heatmap-cell:hover {
+  transform: scale(1.35) !important;
+  z-index: 5;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18) !important;
+  border-color: var(--text-primary);
+}
 
 .heatmap-tooltip {
   visibility: hidden;
+  opacity: 0;
   position: absolute;
-  bottom: 125%;
+  bottom: 145%;
   left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--secondary);
-  color: #fff;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
+  transform: translate(-50%, 6px) scale(0.95);
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-md);
   font-size: 0.75rem;
   white-space: nowrap;
-  z-index: 10;
-  box-shadow: var(--shadow-md);
+  z-index: 100;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0.2s;
 }
 
 .heatmap-cell:hover .heatmap-tooltip {
   visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
 }
 
 /* ----------------------------------------------------
