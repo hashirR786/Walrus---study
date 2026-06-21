@@ -1471,6 +1471,45 @@ button.btn-secondary:hover {
   }
 }
 
+/* ----------------------------------------------------
+   SYLLABUS TRACKER STYLING OVERHAUL
+   ---------------------------------------------------- */
+.subject-card-toggle {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.subject-card-toggle:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.08) !important;
+  border-color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .subject-card-toggle:hover {
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.4) !important;
+  border-color: var(--primary) !important;
+}
+
+.chapter-list-card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chapter-list-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: var(--text-secondary) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+[data-theme="dark"] .chapter-list-card:hover {
+  border-color: var(--primary) !important;
+}
+
+
 
 
 

@@ -160,6 +160,22 @@ router.get('/progress', async (req, res) => {
         streak: { count: 0, lastActive: null }
       });
       await progress.save();
+    } else {
+      // Auto-patch missing subjects from DEFAULT_SYLLABUS
+      let updated = false;
+      const existingSubjectNames = progress.subjectProgress.map(s => s.subjectName);
+      for (const defaultSub of DEFAULT_SYLLABUS) {
+        if (!existingSubjectNames.includes(defaultSub.subjectName)) {
+          progress.subjectProgress.push({
+            subjectName: defaultSub.subjectName,
+            chapters: defaultSub.chapters.map(ch => ({ ...ch }))
+          });
+          updated = true;
+        }
+      }
+      if (updated) {
+        await progress.save();
+      }
     }
     
     return res.json(progress);
