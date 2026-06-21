@@ -209,8 +209,17 @@ export default function App() {
   };
 
   const handleAuthSuccess = (newToken, userData) => {
+    // Flush any shared-key caches from the previous session.
+    // This prevents a new signup (or a different user logging in) from
+    // seeing another user's AI chat, study schedule, or active test.
+    localStorage.removeItem('walrus_active_chat');
+    localStorage.removeItem('walrus_study_schedule');
+    localStorage.removeItem('walrus_active_test');
+    localStorage.removeItem('walrus_tutorial_steps');
+
     setToken(newToken);
     setUser(userData);
+    setProgressData(null); // force a fresh fetch for the new user
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(userData));
     // Clear any previous stream_configured flag when logging in fresh
@@ -221,8 +230,20 @@ export default function App() {
   const handleLogout = () => {
     setToken(null);
     setUser(null);
+    setProgressData(null);
+
+    // Clear auth keys
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+
+    // Clear all non-user-scoped data caches so the next user
+    // (especially a brand-new account) starts with a blank slate.
+    // These keys are shared across users because they have no userId in their key name.
+    localStorage.removeItem('walrus_active_chat');     // AI Tutor ongoing chat
+    localStorage.removeItem('walrus_study_schedule');  // Planner AI schedule
+    localStorage.removeItem('walrus_active_test');     // Practice Engine in-progress test
+    localStorage.removeItem('walrus_tutorial_steps'); // Tutorial completion state
+
     addToast('Logged out successfully', 'success');
   };
 
