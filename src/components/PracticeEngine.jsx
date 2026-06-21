@@ -119,17 +119,15 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   const [violationWarning, setViolationWarning] = useState(null); // { count, reason }
   const [isTerminatedByStrict, setIsTerminatedByStrict] = useState(false);
 
-  // Refs so event handlers always read the latest value without being recreated
-  const testActiveRef = useRef(false);
-  const strictModeRef = useRef(false);
+  // violationWarningRef lets handlers see the current warning state without
+  // being added to the useEffect dep array (which would re-register listeners
+  // and cause false-positive violations on every warning dismissal).
   const violationWarningRef = useRef(null);
-  const strictModeListenersReady = useRef(false); // grace-period gate
-  const triggerViolationRef = useRef(null); // always points to the latest triggerViolation
+  const strictModeListenersReady = useRef(false); // grace-period gate (suppresses fullscreen-entry events)
 
-  // Keep refs in sync with state
-  useEffect(() => { testActiveRef.current = testActive; }, [testActive]);
-  useEffect(() => { strictModeRef.current = strictMode; }, [strictMode]);
-  useEffect(() => { violationWarningRef.current = violationWarning; }, [violationWarning]);
+  // Keep ref in sync with state every render
+  violationWarningRef.current = violationWarning;
+
 
   // History & review
   const [testHistory, setTestHistory] = useState([]);
@@ -283,35 +281,32 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     }
   };
 
-  // Strict mode event listeners
-  // Registered ONCE on mount; they read all live values via refs so they never
-  // go stale and the effect never needs to be torn-down/re-registered mid-exam.
-  // IMPORTANT: triggerViolationRef.current is updated every render (below) so the
-  // handlers always call the latest version with fresh testActive/currentPaper/user.
-  triggerViolationRef.current = triggerViolation;
-
+  // Strict mode event listeners.
+  // Re-registers only when testActive or strictMode change — NOT when violationWarning
+  // changes. That was the original "3 warnings on first switch" bug: re-registering on
+  // every warning fired the fullscreen/blur events again immediately.
+  // violationWarningRef.current is read directly (always current) without being a dep.
   useEffect(() => {
+    if (!testActive || !strictMode) return;
+
     const handleFullscreenChange = () => {
-      if (!testActiveRef.current || !strictModeRef.current) return;
       if (!strictModeListenersReady.current) return; // grace period
       if (!isCurrentlyFullscreen() && !violationWarningRef.current) {
-        triggerViolationRef.current("You exited Fullscreen mode.");
+        triggerViolation('You exited Fullscreen mode.');
       }
     };
 
     const handleVisibilityChange = () => {
-      if (!testActiveRef.current || !strictModeRef.current) return;
       if (!strictModeListenersReady.current) return; // grace period
       if (document.hidden && !violationWarningRef.current) {
-        triggerViolationRef.current("You switched tabs or minimized the window.");
+        triggerViolation('You switched tabs or minimized the window.');
       }
     };
 
     const handleWindowBlur = () => {
-      if (!testActiveRef.current || !strictModeRef.current) return;
       if (!strictModeListenersReady.current) return; // grace period
       if (!violationWarningRef.current) {
-        triggerViolationRef.current("You clicked outside the exam window.");
+        triggerViolation('You clicked outside the exam window.');
       }
     };
 
@@ -326,7 +321,8 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, []); // intentionally empty — refs keep handlers up-to-date without re-registration
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testActive, strictMode]); // intentionally omits violationWarning — read via ref instead
 
   // Download test attempt markdown
   const downloadTestAttempt = (test) => {
