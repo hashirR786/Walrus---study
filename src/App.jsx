@@ -93,6 +93,14 @@ const OFFLINE_GOALS = [
   { taskName: 'Update chapter completion checklist', completed: false }
 ];
 
+const STREAM_SUBJECTS = {
+  general: ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'],
+  pcmb: ['Physics', 'Chemistry', 'Mathematics', 'Biology'],
+  pcmc: ['Physics', 'Chemistry', 'Mathematics', 'Computer Science'],
+  pcb: ['Physics', 'Chemistry', 'Biology'],
+  commerce: ['Economics', 'Mathematics']
+};
+
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [user, setUser] = useState(() => {
@@ -115,6 +123,14 @@ export default function App() {
   const [progressData, setProgressData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+
+  const userStream = user?.stream || 'general';
+  const allowedSubjects = STREAM_SUBJECTS[userStream] || STREAM_SUBJECTS.general;
+
+  const filteredProgressData = progressData ? {
+    ...progressData,
+    subjectProgress: progressData.subjectProgress.filter(s => allowedSubjects.includes(s.subjectName))
+  } : null;
 
   useEffect(() => {
     setMobileHeaderHidden(false);
@@ -400,7 +416,7 @@ export default function App() {
 
           <div style={{ display: activeTab === 'doubt-solver' ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0, overflow: 'hidden' }}>
             <DoubtSolver 
-              progressData={progressData} 
+              progressData={filteredProgressData} 
               onActivityTriggered={handleUpdateStudyTime}
               user={user}
               activeTab={activeTab}
@@ -419,7 +435,7 @@ export default function App() {
           
           <div style={{ display: activeTab === 'syllabus-tracker' ? 'block' : 'none' }}>
             <SyllabusTracker 
-              progressData={progressData} 
+              progressData={filteredProgressData} 
               onUpdateChapter={handleUpdateChapter}
               isLoading={isLoading}
             />
@@ -427,7 +443,7 @@ export default function App() {
           
           <div style={{ display: activeTab === 'practice-engine' ? 'block' : 'none' }}>
             <PracticeEngine 
-              progressData={progressData} 
+              progressData={filteredProgressData} 
               onSaveTestResult={handleSaveTestResult}
               user={user}
               activeTab={activeTab}
@@ -435,12 +451,12 @@ export default function App() {
           </div>
           
           <div style={{ display: activeTab === 'analytics' ? 'block' : 'none' }}>
-            <Analytics progressData={progressData} />
+            <Analytics progressData={filteredProgressData} />
           </div>
           
           <div style={{ display: activeTab === 'planner' ? 'block' : 'none' }}>
             <Planner 
-              progressData={progressData}
+              progressData={filteredProgressData}
               onToggleGoal={handleToggleGoal}
               onUpdateStudyTime={handleUpdateStudyTime}
               onRefreshProfile={fetchProfile}
@@ -448,7 +464,7 @@ export default function App() {
           </div>
           
           <div style={{ display: activeTab === 'community' ? 'block' : 'none' }}>
-            <Community progressData={progressData} user={user} />
+            <Community progressData={filteredProgressData} user={user} />
           </div>
         </div>
       </main>

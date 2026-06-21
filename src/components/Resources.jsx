@@ -4,8 +4,6 @@ import MarkdownRenderer from './MarkdownRenderer';
 
 import { API_BASE } from '../config';
 
-const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
-
 const CHAPTERS_PRESET = {
   Physics: ['Electric Charges and Fields', 'Electrostatic Potential and Capacitance', 'Current Electricity', 'Moving Charges and Magnetism', 'Magnetism and Matter', 'Ray Optics and Wave Optics'],
   Chemistry: ['Solutions', 'Electrochemistry', 'Chemical Kinetics', 'Coordination Compounds'],
@@ -27,7 +25,8 @@ const CHAPTERS_PRESET = {
   ]
 };
 
-export default function Resources({ onActivityTriggered }) {
+export default function Resources({ onActivityTriggered, allowedSubjects }) {
+  const SUBJECTS = allowedSubjects || ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
   const [activeTab, setActiveTab] = useState('textbooks'); // textbooks, formulas
   const [subject, setSubject] = useState(SUBJECTS[0]);
   const [chapter, setChapter] = useState('');

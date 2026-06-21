@@ -40,6 +40,7 @@ export const registerUser = async (req, res) => {
         avatar: user.avatar,
         dailyGoal: user.dailyGoal,
         focusCategory: user.focusCategory,
+        stream: user.stream,
         token: generateToken(user._id),
       });
     } else {
@@ -72,6 +73,7 @@ export const loginUser = async (req, res) => {
         avatar: user.avatar,
         dailyGoal: user.dailyGoal,
         focusCategory: user.focusCategory,
+        stream: user.stream,
         token: generateToken(user._id),
       });
     } else {
@@ -110,6 +112,7 @@ export const updateUserProfile = async (req, res) => {
       if (req.body.avatar !== undefined) user.avatar = req.body.avatar;
       if (req.body.dailyGoal !== undefined) user.dailyGoal = req.body.dailyGoal;
       if (req.body.focusCategory !== undefined) user.focusCategory = req.body.focusCategory;
+      if (req.body.stream !== undefined) user.stream = req.body.stream;
 
       if (req.body.password) {
         user.password = req.body.password;
@@ -124,6 +127,7 @@ export const updateUserProfile = async (req, res) => {
         avatar: updatedUser.avatar,
         dailyGoal: updatedUser.dailyGoal,
         focusCategory: updatedUser.focusCategory,
+        stream: updatedUser.stream,
       });
     } else {
       res.status(404).json({ message: 'User not found' });

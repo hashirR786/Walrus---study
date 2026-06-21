@@ -8,6 +8,7 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
   const [editedAvatar, setEditedAvatar] = useState(user?.avatar || 'walrus_classic');
   const [editedGoal, setEditedGoal] = useState(user?.dailyGoal || 3);
   const [editedCategory, setEditedCategory] = useState(user?.focusCategory || 'general');
+  const [editedStream, setEditedStream] = useState(user?.stream || 'general');
   const [saving, setSaving] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
@@ -100,6 +101,7 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
           avatar: editedAvatar,
           dailyGoal: editedGoal,
           focusCategory: editedCategory,
+          stream: editedStream,
         }),
       });
 
@@ -170,8 +172,19 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
             )}
           </div>
 
-          <h2 className="profile-username-heading" style={{ margin: '0.5rem 0 0.2rem 0', fontSize: '1.5rem', color: 'var(--text-primary)' }}>{user?.username}</h2>
-          <p className="profile-email-sub" style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{user?.email}</p>
+          <p className="profile-email-sub" style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{user?.email}</p>
+          <span className="badge" style={{ 
+            textTransform: 'uppercase', 
+            fontWeight: 700, 
+            fontSize: '0.72rem',
+            marginBottom: '1rem',
+            backgroundColor: 'var(--primary-light)',
+            color: 'var(--primary)',
+            border: '1px solid rgba(140, 130, 107, 0.25)',
+            display: 'inline-block'
+          }}>
+            Stream: {user?.stream === 'pcmb' ? 'Science (PCMB)' : user?.stream === 'pcmc' ? 'Science (PCMC)' : user?.stream === 'pcb' ? 'Science (PCB)' : user?.stream === 'commerce' ? 'Commerce / Humanities' : 'General / Custom'}
+          </span>
 
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
             Member Since: {new Date(user?.createdAt || Date.now()).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -220,6 +233,7 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
                 setEditedAvatar(user?.avatar || 'walrus_classic');
                 setEditedGoal(user?.dailyGoal || 3);
                 setEditedCategory(user?.focusCategory || 'general');
+                setEditedStream(user?.stream || 'general');
               }
               setIsEditing(!isEditing);
             }}
@@ -333,9 +347,8 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
               </div>
             </div>
           )}
-
           {/* PREFERENCES SETTINGS */}
-          <div className="profile-preferences-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="profile-preferences-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             {/* DAILY COMPLETION TARGET GOAL */}
             <div>
               <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
@@ -360,7 +373,7 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
                 </div>
               )}
             </div>
-
+ 
             {/* DEFAULT FOCUS CATEGORY */}
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
@@ -383,6 +396,32 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500, backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', textTransform: 'capitalize' }}>
                   <CheckSquare size={16} className="text-muted" />
                   <span>{user?.focusCategory || 'General'}</span>
+                </div>
+              )}
+            </div>
+
+            {/* SUBJECT STREAM SELECTION */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                Subject Stream
+              </label>
+              {isEditing ? (
+                <select
+                  className="filter-select"
+                  style={{ width: '100%', padding: '0.55rem 0.75rem', height: '2.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)' }}
+                  value={editedStream}
+                  onChange={(e) => setEditedStream(e.target.value)}
+                >
+                  <option value="general">📚 General (All Subjects)</option>
+                  <option value="pcmb">🧪 Science (PCMB)</option>
+                  <option value="pcmc">💻 Science (PCMC)</option>
+                  <option value="pcb">🧬 Science (PCB)</option>
+                  <option value="commerce">📈 Commerce / Eco-Math</option>
+                </select>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500, backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase' }}>
+                  <Sparkles size={16} className="text-muted" />
+                  <span>{user?.stream || 'General'}</span>
                 </div>
               )}
             </div>

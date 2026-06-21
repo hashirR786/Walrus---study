@@ -88,6 +88,7 @@ const QUESTION_TYPES = [
 ];
 
 export default function PracticeEngine({ progressData, onSaveTestResult, user, activeTab }) {
+  const activeSubjects = progressData?.subjectProgress?.map(s => s.subjectName) || SUBJECTS;
   // Load cached active test state from localStorage if available
   const [activeTestCache] = useState(() => {
     try {
@@ -99,7 +100,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   });
 
   const [activeSubTab, setActiveSubTab] = useState(() => activeTestCache?.activeSubTab || 'mock-tests');
-  const [subject, setSubject] = useState(() => activeTestCache?.subject || SUBJECTS[0]);
+  const [subject, setSubject] = useState(() => activeTestCache?.subject || activeSubjects[0] || 'Physics');
   const [chapter, setChapter] = useState(() => activeTestCache?.chapter || 'All Chapters');
 
   // Mock test state
@@ -817,7 +818,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
 
       {/* Subject selector */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-        {SUBJECTS.map(sub => (
+        {activeSubjects.map(sub => (
           <button key={sub} className="btn-secondary"
             style={{
               padding: '0.5rem 1rem', fontSize: '0.85rem',

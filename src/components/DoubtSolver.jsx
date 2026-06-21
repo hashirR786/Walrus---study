@@ -52,6 +52,7 @@ const INITIAL_MESSAGE = {
 };
 
 export default function DoubtSolver({ progressData, onActivityTriggered, user, activeTab, onScrollDirectionChange }) {
+  const activeSubjects = progressData?.subjectProgress?.map(s => s.subjectName) || ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
   // Load cached active chat from localStorage if available
   const [activeChatCache] = useState(() => {
     try {
@@ -62,7 +63,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     }
   });
 
-  const [subject, setSubject] = useState(() => activeChatCache?.subject || SUBJECTS_LIST[0]);
+  const [subject, setSubject] = useState(() => activeChatCache?.subject || activeSubjects[0] || 'Physics');
   const [chapter, setChapter] = useState(() => activeChatCache?.chapter || 'All Chapters');
   const [mode, setMode] = useState(() => activeChatCache?.mode || 'Doubt Solver');
   const [studentInput, setStudentInput] = useState('');
@@ -558,7 +559,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
               <label style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Subject</label>
               <select className="input-control" style={{ padding: '0.45rem 0.7rem', fontSize: '0.88rem', height: '2.1rem', backgroundColor: 'var(--bg-app)' }}
                 value={subject} onChange={e => setSubject(e.target.value)}>
-                {SUBJECTS_LIST.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                {activeSubjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
