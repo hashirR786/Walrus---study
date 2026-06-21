@@ -119,6 +119,17 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   const [violationWarning, setViolationWarning] = useState(null); // { count, reason }
   const [isTerminatedByStrict, setIsTerminatedByStrict] = useState(false);
 
+  // Refs so event handlers always read the latest value without being recreated
+  const testActiveRef = useRef(false);
+  const strictModeRef = useRef(false);
+  const violationWarningRef = useRef(null);
+  const strictModeListenersReady = useRef(false); // grace-period gate
+
+  // Keep refs in sync with state
+  useEffect(() => { testActiveRef.current = testActive; }, [testActive]);
+  useEffect(() => { strictModeRef.current = strictMode; }, [strictMode]);
+  useEffect(() => { violationWarningRef.current = violationWarning; }, [violationWarning]);
+
   // History & review
   const [testHistory, setTestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -272,23 +283,30 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   };
 
   // Strict mode event listeners
+  // Registered ONCE on mount; they read all live values via refs so they never
+  // go stale and the effect never needs to be torn-down/re-registered mid-exam
+  // (which was the root cause of the false-positive "exceeded 3 warnings" bug).
   useEffect(() => {
-    if (!testActive || !strictMode) return;
-
     const handleFullscreenChange = () => {
-      if (!isCurrentlyFullscreen() && !violationWarning) {
+      if (!testActiveRef.current || !strictModeRef.current) return;
+      if (!strictModeListenersReady.current) return; // grace period
+      if (!isCurrentlyFullscreen() && !violationWarningRef.current) {
         triggerViolation("You exited Fullscreen mode.");
       }
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden && !violationWarning) {
+      if (!testActiveRef.current || !strictModeRef.current) return;
+      if (!strictModeListenersReady.current) return; // grace period
+      if (document.hidden && !violationWarningRef.current) {
         triggerViolation("You switched tabs or minimized the window.");
       }
     };
 
     const handleWindowBlur = () => {
-      if (!violationWarning) {
+      if (!testActiveRef.current || !strictModeRef.current) return;
+      if (!strictModeListenersReady.current) return; // grace period
+      if (!violationWarningRef.current) {
         triggerViolation("You clicked outside the exam window.");
       }
     };
@@ -304,7 +322,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [testActive, strictMode, violationWarning]);
+  }, []); // intentionally empty — refs keep handlers up-to-date without re-registration
 
   // Download test attempt markdown
   const downloadTestAttempt = (test) => {
@@ -1065,11 +1083,19 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                 <button 
                   className="btn-primary" 
                   onClick={async () => {
+                    // Reset all violation state for the fresh attempt
                     setViolations(0);
+                    setViolationWarning(null);
+                    violationWarningRef.current = null;
+                    setIsTerminatedByStrict(false);
+                    strictModeListenersReady.current = false; // arm the grace period
+
                     setTimeLeft(testDuration * 60);
                     setTestActive(true);
+
                     if (strictMode) {
                       enterFullscreen();
+                      // Reset server-side warning counter for this exam session
                       try {
                         await fetch(`${API_BASE}/student/exam/warning/reset`, {
                           method: 'POST',
@@ -1083,6 +1109,14 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                         console.warn("Could not reset warning count in RedVER:", e.message);
                       }
                     }
+
+                    // Grace period: ignore all focus/fullscreen events fired during
+                    // the browser's own fullscreen-entry transition (typically <1 s).
+                    // Without this, entering fullscreen triggers a spurious `blur`
+                    // or `fullscreenchange` event that counts as violation #1.
+                    setTimeout(() => {
+                      strictModeListenersReady.current = true;
+                    }, 1500);
                   }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                 >
