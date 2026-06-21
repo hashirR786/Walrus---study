@@ -124,6 +124,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   const strictModeRef = useRef(false);
   const violationWarningRef = useRef(null);
   const strictModeListenersReady = useRef(false); // grace-period gate
+  const triggerViolationRef = useRef(null); // always points to the latest triggerViolation
 
   // Keep refs in sync with state
   useEffect(() => { testActiveRef.current = testActive; }, [testActive]);
@@ -284,14 +285,17 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
 
   // Strict mode event listeners
   // Registered ONCE on mount; they read all live values via refs so they never
-  // go stale and the effect never needs to be torn-down/re-registered mid-exam
-  // (which was the root cause of the false-positive "exceeded 3 warnings" bug).
+  // go stale and the effect never needs to be torn-down/re-registered mid-exam.
+  // IMPORTANT: triggerViolationRef.current is updated every render (below) so the
+  // handlers always call the latest version with fresh testActive/currentPaper/user.
+  triggerViolationRef.current = triggerViolation;
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!testActiveRef.current || !strictModeRef.current) return;
       if (!strictModeListenersReady.current) return; // grace period
       if (!isCurrentlyFullscreen() && !violationWarningRef.current) {
-        triggerViolation("You exited Fullscreen mode.");
+        triggerViolationRef.current("You exited Fullscreen mode.");
       }
     };
 
@@ -299,7 +303,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       if (!testActiveRef.current || !strictModeRef.current) return;
       if (!strictModeListenersReady.current) return; // grace period
       if (document.hidden && !violationWarningRef.current) {
-        triggerViolation("You switched tabs or minimized the window.");
+        triggerViolationRef.current("You switched tabs or minimized the window.");
       }
     };
 
@@ -307,7 +311,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       if (!testActiveRef.current || !strictModeRef.current) return;
       if (!strictModeListenersReady.current) return; // grace period
       if (!violationWarningRef.current) {
-        triggerViolation("You clicked outside the exam window.");
+        triggerViolationRef.current("You clicked outside the exam window.");
       }
     };
 
