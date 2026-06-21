@@ -112,27 +112,67 @@ export default function Sidebar({
       </div>
 
       {streakCount > 0 && (
-        <div className="badge badge-warning" style={{ marginBottom: '1.5rem', alignSelf: 'flex-start', gap: '0.4rem', fontSize: '0.8rem' }}>
-          <span>🔥 {streakCount} Day Streak!</span>
+        <div className="streak-badge-premium">
+          <span className="streak-fire-icon">🔥</span>
+          <span>{streakCount} Day Streak!</span>
         </div>
       )}
 
-      <ul className="nav-menu">
-        {menuItems.map((item) => {
-          const IconComponent = item.icon;
-          return (
-            <li key={item.id}>
-              <a 
-                className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
-              >
-                <IconComponent size={20} />
-                <span>{item.label}</span>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="nav-menu">
+        <div className="nav-group-header">Learning Core</div>
+        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {menuItems.filter(item => ['doubt-solver', 'syllabus-tracker', 'practice-engine'].includes(item.id)).map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <li key={item.id}>
+                <a 
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
+                >
+                  <IconComponent size={18} />
+                  <span>{item.label}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="nav-group-header">Productivity & Insights</div>
+        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {menuItems.filter(item => ['planner', 'analytics'].includes(item.id)).map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <li key={item.id}>
+                <a 
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
+                >
+                  <IconComponent size={18} />
+                  <span>{item.label}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="nav-group-header">Explore</div>
+        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {menuItems.filter(item => ['community', 'tutorial'].includes(item.id)).map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <li key={item.id}>
+                <a 
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
+                >
+                  <IconComponent size={18} />
+                  <span>{item.label}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       <div className="sidebar-controls">
         {/* Logged in User Profile Node */}
@@ -144,7 +184,7 @@ export default function Sidebar({
               alignItems: 'center',
               gap: '0.6rem', 
               padding: '0.65rem 0.85rem', 
-              backgroundColor: activeTab === 'profile' ? 'var(--primary-light)' : 'var(--bg-card-hover)', 
+              backgroundColor: activeTab === 'profile' ? 'var(--primary-light)' : 'rgba(var(--primary-rgb), 0.04)', 
               borderRadius: 'var(--radius-md)', 
               border: activeTab === 'profile' ? '1px solid var(--primary)' : '1px solid var(--border-color)', 
               fontSize: '0.8rem',
@@ -152,6 +192,7 @@ export default function Sidebar({
               transition: 'all 0.2s ease',
               minWidth: 0
             }}
+            className="sidebar-profile-card"
           >
             <div style={{
               width: '32px',
@@ -173,31 +214,31 @@ export default function Sidebar({
                 <span>{(user.username || 'W').charAt(0).toUpperCase()}</span>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', textAlign: 'left', minWidth: 0 }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.username}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', textAlign: 'left', minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem', width: '100%', overflow: 'hidden' }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user.username}
+                </span>
+                <span className="sidebar-stream-tag" style={{
+                  fontSize: '0.58rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  backgroundColor: 'var(--primary-light)',
+                  color: 'var(--primary)',
+                  padding: '0.1rem 0.3rem',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(var(--primary-rgb), 0.15)',
+                  flexShrink: 0
+                }}>
+                  {user.stream === 'general' || !user.stream ? 'ALL' : user.stream}
+                </span>
+              </div>
               <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
                 {user.email}
               </span>
             </div>
           </div>
         )}
-
-        <div>
-          <div className="theme-picker-title">Accent Theme</div>
-          <div className="theme-presets-grid">
-            {ACCENTS.map((acc) => (
-              <div
-                key={acc.name}
-                className={`preset-dot ${accent === acc.name ? 'active' : ''}`}
-                style={{ backgroundColor: acc.hex }}
-                title={acc.label}
-                onClick={() => setAccent(acc.name)}
-              />
-            ))}
-          </div>
-        </div>
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button className="theme-toggle-btn" onClick={toggleTheme} title="Switch Light/Dark Mode" style={{ flex: 1 }}>

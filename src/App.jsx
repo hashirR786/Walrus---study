@@ -11,6 +11,7 @@ import Community from './components/Community';
 import Auth from './components/Auth';
 import ProfileView from './components/ProfileView';
 import Tutorial from './components/Tutorial';
+import StreamSetup from './components/StreamSetup';
 import { API_BASE } from './config';
 
 
@@ -124,6 +125,15 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
+  // Show stream setup if user hasn't explicitly set a stream.
+  // Skip if:  (a) they've been through setup before (localStorage flag), OR
+  //           (b) they already have a non-"general" stream saved in their DB profile
+  const alreadyConfigured = user && (
+    localStorage.getItem(`stream_configured_${user._id}`) ||
+    (user.stream && user.stream !== 'general')
+  );
+  const needsStreamSetup = user && !alreadyConfigured;
+
   const userStream = user?.stream || 'general';
   const allowedSubjects = STREAM_SUBJECTS[userStream] || STREAM_SUBJECTS.general;
 
@@ -203,6 +213,9 @@ export default function App() {
     setUser(userData);
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(userData));
+    // Clear any previous stream_configured flag when logging in fresh
+    // so returning users who haven't set it will see the setup screen
+    // Note: if they already have a non-general stream saved in DB, they won't see it (handled via needsStreamSetup)
   };
 
   const handleLogout = () => {
@@ -358,6 +371,35 @@ export default function App() {
             <div 
               key={t.id} 
               className={`badge badge-${t.type === 'danger' ? 'danger' : t.type === 'warning' ? 'warning' : 'success'}`} 
+              style={{ padding: '0.8rem 1.4rem', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}
+            >
+              {t.msg}
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  // Stream setup gate: show onboarding for users who haven't picked a stream
+  if (needsStreamSetup) {
+    return (
+      <>
+        <StreamSetup
+          user={user}
+          token={token}
+          onComplete={(updatedUser) => {
+            handleUpdateUser(updatedUser);
+            // Mark as configured so we don't show again
+            localStorage.setItem(`stream_configured_${user._id}`, '1');
+          }}
+        />
+        {/* Floating Toasts */}
+        <div style={{ position: 'fixed', top: '24px', right: '24px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 10000 }}>
+          {toasts.map(t => (
+            <div
+              key={t.id}
+              className={`badge badge-${t.type === 'danger' ? 'danger' : t.type === 'warning' ? 'warning' : 'success'}`}
               style={{ padding: '0.8rem 1.4rem', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}
             >
               {t.msg}

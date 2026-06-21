@@ -319,6 +319,8 @@ export default function Community({ progressData, user }) {
     return `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
   };
 
+  const activeSubjects = progressData?.subjectProgress?.map(s => s.subjectName) || ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
+
   return (
     <div className="glass-panel" style={{ maxWidth: '950px', margin: '0 auto' }}>
       {/* Inline Confirm Dialog */}
@@ -340,9 +342,14 @@ export default function Community({ progressData, user }) {
               className="btn-secondary"
               onClick={() => setActiveTab(tab)}
               style={{
+                borderRadius: '30px',
+                padding: '0.5rem 1.25rem',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === tab ? '700' : '500',
                 borderColor: activeTab === tab ? 'var(--primary)' : 'var(--border-color)',
-                backgroundColor: activeTab === tab ? 'var(--primary-light)' : 'var(--bg-card)',
-                color: activeTab === tab ? 'var(--primary)' : 'var(--text-primary)'
+                backgroundColor: activeTab === tab ? 'var(--primary-light)' : 'transparent',
+                color: activeTab === tab ? 'var(--primary)' : 'var(--text-secondary)',
+                transition: 'all 0.25s ease'
               }}
             >
               {tab === 'forum' ? 'Doubt Forum' : tab === 'notes' ? 'Share Notes' : 'Study Room'}
@@ -362,28 +369,38 @@ export default function Community({ progressData, user }) {
                   value={newThreadTitle} onChange={e => setNewThreadTitle(e.target.value)} />
                 <textarea className="input-control" rows={3} placeholder="Describe your doubt in detail..." required
                   value={newThreadContent} onChange={e => setNewThreadContent(e.target.value)} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <select className="input-control" style={{ padding: '0.4rem' }} value={newThreadSubject} onChange={e => setNewThreadSubject(e.target.value)}>
-                    {['Physics','Chemistry','Mathematics','Biology','Economics','Computer Science'].map(s => <option key={s}>{s}</option>)}
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+                  <select 
+                    className="input-control" 
+                    style={{ flex: 1, minWidth: '150px', padding: '0.5rem 0.75rem', height: '2.5rem', borderRadius: 'var(--radius-sm)' }} 
+                    value={newThreadSubject} 
+                    onChange={e => setNewThreadSubject(e.target.value)}
+                  >
+                    {activeSubjects.map(s => <option key={s}>{s}</option>)}
                   </select>
-                  <button type="submit" className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Ask Doubt</button>
+                  <button 
+                    type="submit" 
+                    className="btn-primary" 
+                    style={{ padding: '0 1.5rem', height: '2.5rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    Ask Doubt
+                  </button>
                 </div>
               </form>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {threads.map(t => (
                 <div key={t._id}
-                  className="card"
-                  style={{ cursor: 'pointer', borderColor: selectedThread?._id === t._id ? 'var(--primary)' : 'var(--border-color)', backgroundColor: selectedThread?._id === t._id ? 'var(--primary-light)' : 'var(--bg-card)' }}
+                  className={`community-thread-card ${selectedThread?._id === t._id ? 'active' : ''}`}
                   onClick={() => setSelectedThread(t)}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                     <span className="badge badge-primary">{t.subject}</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Asked by {t.askedBy}</span>
                   </div>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 600 }}>{t.title}</h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.content}</p>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 600 }}>{t.title}</h4>
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.content}</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       <MessageSquare size={14} /><span>{t.answers?.length || 0} solutions</span>
@@ -463,7 +480,7 @@ export default function Community({ progressData, user }) {
                 { label: 'Note Title *', el: <input type="text" className="input-control" placeholder="e.g. Wave Optics Notes" required value={newNoteTitle} onChange={e => setNewNoteTitle(e.target.value)} /> },
                 { label: 'Subject *', el: (
                   <select className="input-control" value={newNoteSubject} onChange={e => setNewNoteSubject(e.target.value)}>
-                    {['Physics','Chemistry','Mathematics','Biology','Economics','Computer Science'].map(s => <option key={s}>{s}</option>)}
+                    {activeSubjects.map(s => <option key={s}>{s}</option>)}
                   </select>
                 )},
                 { label: 'Description', el: <textarea className="input-control" rows={2} placeholder="What do these notes cover?" value={newNoteDescription} onChange={e => setNewNoteDescription(e.target.value)} /> },
@@ -493,7 +510,7 @@ export default function Community({ progressData, user }) {
             <h3 style={{ marginBottom: '1rem' }}>Shared Notes</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '480px', overflowY: 'auto' }}>
               {sharedNotes.length > 0 ? sharedNotes.map(note => (
-                <div key={note._id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-app)' }}>
+                <div key={note._id} className="community-note-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <span className="badge badge-primary" style={{ marginBottom: '0.25rem' }}>{note.subject}</span>
