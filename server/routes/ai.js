@@ -795,7 +795,46 @@ Syllabus Status: ${JSON.stringify(summarizedProgress)}
 Exam Target Date: ${examDate || 'Next month'}
 Target Board Score: ${targetScore || '95%'}
 
-Return a structured markdown output detailing which subjects/chapters they need to focus on this week, daily recommended Pomodoro slots, and PYQ challenges. Include encouragement!`;
+You MUST structure the response EXACTLY using the following sections and markdown structure:
+
+# 📅 Customisable Weekly AI Study Schedule *(Aiming for ${targetScore || '95%'} by ${examDate || 'Target Date'})*
+
+> [!NOTE]
+> This plan is a template – feel free to swap subjects, adjust Pomodoro counts, or add extra revision slots as per your comfort. The key is consistency and focused practice.
+
+---
+
+### 🧪 Subject Focus & Objectives
+Provide a bulleted list of subjects/chapters to focus on this week (prioritize active/in-progress subjects and the highest priority ones to catch up on).
+Format:
+- **[Subject Name]** (e.g., *Physics*): Focus on completing **[Chapter Name]** (Current Progress: X%). *Objective:* [Brief goal, e.g., Master Rutherford's model and Bohr's model].
+
+---
+
+### ⏱️ Day-by-Day Study Plan
+Structure the daily schedule as a clean list of days instead of a giant table (to prevent truncation and table overflow). Each day should recommend 2-3 specific Pomodoro sessions (e.g. 25m study + 5m break) focused on the subjects above.
+Format:
+- **Monday**: 
+  - ⏱️ *Pomodoro 1 & 2*: [Subject] - [Chapter] ([Task, e.g., Read NCERT pages 12-20 and draw key diagrams])
+  - ⏱️ *Pomodoro 3*: [Subject] - [Chapter] ([Task])
+- **Tuesday**:
+  ... (up to Sunday)
+
+> [!TIP]
+> Keep your Pomodoro sessions strictly focused. Avoid multi-tasking during a 25-minute block.
+
+---
+
+### 📚 Weekly PYQ (Past Year Question) Challenge
+Give exactly 3 high-yield PYQ tasks for this week based on the active subjects:
+1. **[Subject]** (*[Chapter]*): Practice [Type of question, e.g., 3-mark derivation of Bohr's radius formula] (CBSE Board PYQ 2022/2023).
+2. ...
+3. ...
+
+---
+
+### 🌟 Weekly Mindset & Encouragement
+A short 2-3 sentence paragraph of high-energy encouragement.`;
 
   try {
     const schedule = await callGroqAPI([
