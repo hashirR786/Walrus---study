@@ -42,7 +42,7 @@ How you must behave:
   - Render all mathematical relations, equations, and expressions in clean LaTeX block ($$ ... $$) or inline ($ ... $) formatting.`;
 
 // Utility to contact Groq API via Fetch
-async function callGroqAPI(messages, temperature = 0.2, responseFormat = null) {
+async function callGroqAPI(messages, temperature = 0.2, responseFormat = null, maxTokens = null) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
 
@@ -53,9 +53,9 @@ async function callGroqAPI(messages, temperature = 0.2, responseFormat = null) {
   // Conditionally configure reasoning options to avoid 400 Bad Request on standard models
   if (model.startsWith('openai/gpt-oss') || model.includes('deepseek')) {
     payload.reasoning_format = 'parsed';
-    payload.max_tokens = 4000;
+    payload.max_tokens = maxTokens || 4000;
   } else {
-    payload.max_tokens = 4000;
+    payload.max_tokens = maxTokens || 4000;
   }
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -178,7 +178,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       ...chatHistory.slice(-6),
       { role: 'user', content: userPrompt }
     ];
-    const reply = await callGroqAPI(messages);
+    const reply = await callGroqAPI(messages, 0.2, null, 2500);
     console.log('✅ Groq fallback answered successfully');
     const successResponse = { response: reply, model: 'groq-gpt-oss' };
     try {
@@ -762,8 +762,36 @@ Include:
 router.post('/generate-schedule', async (req, res) => {
   const { subjectProgress, examDate, targetScore } = req.body;
 
+  // Summarize subject progress to keep prompt size small and avoid TPM rate limits (8000 TPM limit on openai/gpt-oss-20b)
+  let summarizedProgress = [];
+  if (Array.isArray(subjectProgress)) {
+    summarizedProgress = subjectProgress.map(sub => {
+      const inProgress = (sub.chapters || [])
+        .filter(c => c.status === 'InProgress')
+        .map(c => c.chapterName);
+      const completed = (sub.chapters || [])
+        .filter(c => c.status === 'Completed')
+        .map(c => c.chapterName);
+      const todoCount = (sub.chapters || [])
+        .filter(c => c.status === 'Todo' || !c.status).length;
+      
+      const totalCount = (sub.chapters || []).length;
+      const percent = totalCount > 0 ? Math.round((completed.length / totalCount) * 100) : 0;
+
+      return {
+        subject: sub.subjectName,
+        percentComplete: `${percent}%`,
+        inProgressChapters: inProgress,
+        completedChapters: completed,
+        todoChaptersCount: todoCount
+      };
+    });
+  } else {
+    summarizedProgress = subjectProgress;
+  }
+
   const prompt = `Generate a highly customisable weekly AI study schedule for a CBSE student with:
-Syllabus Status: ${JSON.stringify(subjectProgress)}
+Syllabus Status: ${JSON.stringify(summarizedProgress)}
 Exam Target Date: ${examDate || 'Next month'}
 Target Board Score: ${targetScore || '95%'}
 
@@ -773,7 +801,7 @@ Return a structured markdown output detailing which subjects/chapters they need 
     const schedule = await callGroqAPI([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: prompt }
-    ]);
+    ], 0.2, null, 2000); // Override maxTokens to 2000 to stay well under the 8000 TPM limit
     return res.json({ schedule });
   } catch (error) {
     console.warn('Groq schedule generation failed, returning fallback planner:', error.message);
@@ -906,7 +934,7 @@ router.post('/generate-flashcards', async (req, res) => {
     const responseText = await callGroqAPI([
       { role: 'system', content: 'You are an expert CBSE learning scientist. Return valid JSON only containing an array of flashcard objects with keys "q" and "a".' },
       { role: 'user', content: prompt }
-    ], 0.2, { type: 'json_object' });
+    ], 0.2, { type: 'json_object' }, 2000);
 
     let cleanText = responseText.trim();
     const parsed = JSON.parse(cleanText);
