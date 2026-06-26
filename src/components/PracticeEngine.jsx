@@ -119,11 +119,11 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   const [violationWarning, setViolationWarning] = useState(null); // { count, reason }
   const [isTerminatedByStrict, setIsTerminatedByStrict] = useState(false);
 
-  // violationWarningRef lets handlers see the current warning state without
-  // being added to the useEffect dep array (which would re-register listeners
-  // and cause false-positive violations on every warning dismissal).
+  // Refs so event handlers always read the latest values/functions without stale closures
   const violationWarningRef = useRef(null);
-  const strictModeListenersReady = useRef(false); // grace-period gate (suppresses fullscreen-entry events)
+  const lastFullscreenTimeRef = useRef(0);
+  const handleSubmitTestRef = useRef(null);
+  const triggerViolationRef = useRef(null);
 
   // Keep ref in sync with state every render
   violationWarningRef.current = violationWarning;
@@ -225,6 +225,11 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     }
   };
 
+  const enterFullscreenWithGrace = () => {
+    lastFullscreenTimeRef.current = Date.now();
+    enterFullscreen();
+  };
+
   const isCurrentlyFullscreen = () => {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   };
@@ -252,7 +257,11 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
           document.webkitExitFullscreen();
         }
         setViolationWarning(null);
-        handleSubmitTest();
+        if (handleSubmitTestRef.current) {
+          handleSubmitTestRef.current();
+        } else {
+          handleSubmitTest();
+        }
         setViolations(0);
       } else {
         setViolations(next);
@@ -271,7 +280,11 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
             document.webkitExitFullscreen();
           }
           setViolationWarning(null);
-          handleSubmitTest();
+          if (handleSubmitTestRef.current) {
+            handleSubmitTestRef.current();
+          } else {
+            handleSubmitTest();
+          }
           return 0;
         } else {
           setViolationWarning({ count: next, reason });
@@ -290,23 +303,29 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     if (!testActive || !strictMode) return;
 
     const handleFullscreenChange = () => {
-      if (!strictModeListenersReady.current) return; // grace period
+      if (Date.now() - lastFullscreenTimeRef.current < 2000) return; // grace period
       if (!isCurrentlyFullscreen() && !violationWarningRef.current) {
-        triggerViolation('You exited Fullscreen mode.');
+        if (triggerViolationRef.current) {
+          triggerViolationRef.current('You exited Fullscreen mode.');
+        }
       }
     };
 
     const handleVisibilityChange = () => {
-      if (!strictModeListenersReady.current) return; // grace period
+      if (Date.now() - lastFullscreenTimeRef.current < 2000) return; // grace period
       if (document.hidden && !violationWarningRef.current) {
-        triggerViolation('You switched tabs or minimized the window.');
+        if (triggerViolationRef.current) {
+          triggerViolationRef.current('You switched tabs or minimized the window.');
+        }
       }
     };
 
     const handleWindowBlur = () => {
-      if (!strictModeListenersReady.current) return; // grace period
+      if (Date.now() - lastFullscreenTimeRef.current < 2000) return; // grace period
       if (!violationWarningRef.current) {
-        triggerViolation('You clicked outside the exam window.');
+        if (triggerViolationRef.current) {
+          triggerViolationRef.current('You clicked outside the exam window.');
+        }
       }
     };
 
@@ -405,8 +424,6 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       });
       const paper = await res.json();
       setCurrentPaper(paper);
-      setTimeLeft(testDuration * 60);
-      setTestActive(true);
     } catch (err) {
       console.error(err);
       alert('Could not start mock test. Please ensure backend is running.');
@@ -809,6 +826,10 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
 
   const chaptersForSubject = CHAPTERS_PRESET[subject] || [];
 
+  // Keep function refs in sync on every render so handlers can access the latest closure states
+  handleSubmitTestRef.current = handleSubmitTest;
+  triggerViolationRef.current = triggerViolation;
+
   return (
     <div className="glass-panel" style={{ maxWidth: '950px', margin: '0 auto' }}>
       {/* Header */}
@@ -1088,13 +1109,12 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                     setViolationWarning(null);
                     violationWarningRef.current = null;
                     setIsTerminatedByStrict(false);
-                    strictModeListenersReady.current = false; // arm the grace period
 
                     setTimeLeft(testDuration * 60);
                     setTestActive(true);
 
                     if (strictMode) {
-                      enterFullscreen();
+                      enterFullscreenWithGrace();
                       // Reset server-side warning counter for this exam session
                       try {
                         await fetch(`${API_BASE}/student/exam/warning/reset`, {
@@ -1109,14 +1129,6 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                         console.warn("Could not reset warning count in RedVER:", e.message);
                       }
                     }
-
-                    // Grace period: ignore all focus/fullscreen events fired during
-                    // the browser's own fullscreen-entry transition (typically <1 s).
-                    // Without this, entering fullscreen triggers a spurious `blur`
-                    // or `fullscreenchange` event that counts as violation #1.
-                    setTimeout(() => {
-                      strictModeListenersReady.current = true;
-                    }, 1500);
                   }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                 >
@@ -1694,7 +1706,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
             <button 
               className="btn-primary" 
               onClick={() => {
-                enterFullscreen();
+                enterFullscreenWithGrace();
                 setViolationWarning(null);
               }}
               style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none', padding: '0.75rem 2rem', fontWeight: 'bold' }}

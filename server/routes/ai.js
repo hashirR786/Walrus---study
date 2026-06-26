@@ -46,8 +46,17 @@ async function callGroqAPI(messages, temperature = 0.2, responseFormat = null) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
 
-  const payload = { model: 'llama-3.3-70b-versatile', messages, temperature };
+  const model = 'openai/gpt-oss-20b';
+  const payload = { model, messages, temperature };
   if (responseFormat) payload.response_format = responseFormat;
+
+  // Conditionally configure reasoning options to avoid 400 Bad Request on standard models
+  if (model.startsWith('openai/gpt-oss') || model.includes('deepseek')) {
+    payload.reasoning_format = 'parsed';
+    payload.max_tokens = 4000;
+  } else {
+    payload.max_tokens = 4000;
+  }
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -171,7 +180,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     ];
     const reply = await callGroqAPI(messages);
     console.log('✅ Groq fallback answered successfully');
-    const successResponse = { response: reply, model: 'groq-llama' };
+    const successResponse = { response: reply, model: 'groq-gpt-oss' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
