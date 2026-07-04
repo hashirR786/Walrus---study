@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Timer, Award, Layers, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Zap, RotateCcw, Sparkles, AlertCircle, Plus, Trash2 } from 'lucide-react';
-import MarkdownRenderer from './MarkdownRenderer';
+import MarkdownRenderer, { LatexText } from './MarkdownRenderer';
 import { API_BASE } from '../config';
 
 const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
@@ -1171,9 +1171,9 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         {questions.map(q => (
                           <div key={q.id}>
-                            <p style={{ fontWeight: 500, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                            <p style={{ fontWeight: 500, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                               <span style={{ color: 'var(--primary)', fontWeight: 700, minWidth: '2rem' }}>{q.id}.</span>
-                              <span style={{ whiteSpace: 'pre-wrap' }}>{q.question}</span>
+                              <span style={{ whiteSpace: 'pre-wrap', flex: 1, lineHeight: 1.6 }}><LatexText text={q.question} /></span>
                               <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>[{q.marks}m]</span>
                             </p>
                             {q.options ? (
@@ -1182,7 +1182,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                                   <label key={opt} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: `1px solid ${studentAnswers[q.id] === opt ? 'var(--primary)' : 'var(--border-color)'}`, borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', backgroundColor: studentAnswers[q.id] === opt ? 'var(--primary-light)' : 'transparent' }}>
                                     <input type="radio" name={q.id} value={opt} checked={studentAnswers[q.id] === opt}
                                       onChange={e => setStudentAnswers({ ...studentAnswers, [q.id]: e.target.value })} />
-                                    <span>{opt}</span>
+                                    <span><LatexText text={opt} /></span>
                                   </label>
                                 ))}
                               </div>
@@ -1402,7 +1402,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
                         <span style={{ color: 'var(--primary)', fontWeight: 700, minWidth: '2rem', fontSize: '0.95rem' }}>Q{idx + 1}.</span>
                         <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontWeight: 500, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{q.question}</p>
+                          <p style={{ margin: 0, fontWeight: 500, lineHeight: 1.6 }}><LatexText text={q.question} /></p>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>[{q.marks} mark{q.marks > 1 ? 's' : ''}]</span>
                         </div>
                       </div>
@@ -1420,7 +1420,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                               <label key={opt} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: isRevealed ? 'default' : 'pointer', padding: '0.45rem 0.65rem', border: `1px solid ${border}`, borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', backgroundColor: bg, color }}>
                                 <input type="radio" name={q.id} value={opt} disabled={isRevealed} checked={isSelected}
                                   onChange={() => setQpAnswers({ ...qpAnswers, [q.id]: opt })} />
-                                <span>{opt}</span>
+                                <span><LatexText text={opt} /></span>
                               </label>
                             );
                           })}
@@ -1442,7 +1442,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
 
                       {isRevealed && q.answer && (
                         <div style={{ marginLeft: '2.75rem', padding: '0.6rem 0.9rem', backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', fontSize: '0.87rem', color: 'var(--text-primary)' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--success)' }}>✅ Correct Answer: </span>{q.answer}
+                          <span style={{ fontWeight: 700, color: 'var(--success)' }}>✅ Correct Answer: </span><LatexText text={q.answer} />
                         </div>
                       )}
                       {isRevealed && !q.answer && (

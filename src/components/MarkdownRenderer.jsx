@@ -1,7 +1,7 @@
 import React from 'react';
 
 // KaTeX Renderer Subcomponent for safe LaTeX rendering
-const KatexRenderer = ({ formula, displayMode }) => {
+export const KatexRenderer = ({ formula, displayMode }) => {
   const containerRef = React.useRef(null);
   const [hasError, setHasError] = React.useState(false);
 
@@ -178,6 +178,76 @@ const CodeBlock = ({ language, code }) => {
     </div>
   );
 };
+
+// ── LatexText: lightweight inline LaTeX + bold + code renderer for questions ──
+// Use this for rendering question text, MCQ options, and model answers where
+// the full block-level MarkdownRenderer is not needed.
+export function LatexText({ text }) {
+  if (!text) return null;
+
+  // Split on $$...$$, then $...$
+  const blockMathRe = /(\$\$[\s\S]+?\$\$)/g;
+  const inlineMathRe = /(\$[^$\n]+?\$)/g;
+  const boldRe = /(\*\*[^*]+?\*\*)/g;
+  const codeRe = /(`[^`]+`)/g;
+
+  // Process a plain string into React nodes (bold + inline code)
+  const processBoldAndCode = (str, baseKey) =>
+    str.split(boldRe).flatMap((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return [<strong key={`b${baseKey}-${i}`} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>];
+      }
+      return part.split(codeRe).map((cp, j) => {
+        if (cp.startsWith('`') && cp.endsWith('`')) {
+          return (
+            <code key={`c${baseKey}-${i}-${j}`} style={{
+              backgroundColor: '#1a1a1a', color: '#e0e0e0',
+              border: '1px solid #333', borderRadius: '4px',
+              padding: '0.1rem 0.35rem', fontSize: '0.85em',
+              fontFamily: '"Fira Code", monospace'
+            }}>{cp.slice(1, -1)}</code>
+          );
+        }
+        return cp;
+      });
+    });
+
+  // First split on block math $$...$$
+  const segments = text.split(blockMathRe);
+  const nodes = [];
+  segments.forEach((seg, si) => {
+    if (seg.startsWith('$$') && seg.endsWith('$$')) {
+      const formula = seg.slice(2, -2).trim();
+      nodes.push(
+        <div key={`bm-${si}`} style={{
+          margin: '0.6rem 0', textAlign: 'center', padding: '0.5rem',
+          backgroundColor: 'var(--bg-card-hover)',
+          borderRadius: '4px', border: '1px solid var(--border-color)',
+          overflowX: 'auto'
+        }}>
+          <KatexRenderer formula={formula} displayMode={true} />
+        </div>
+      );
+      return;
+    }
+    // Split remaining on inline math $...$
+    const inlineParts = seg.split(inlineMathRe);
+    inlineParts.forEach((part, pi) => {
+      if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+        const formula = part.slice(1, -1).trim();
+        nodes.push(<KatexRenderer key={`im-${si}-${pi}`} formula={formula} displayMode={false} />);
+        return;
+      }
+      // Plain text — apply bold and code
+      const formatted = processBoldAndCode(part, `${si}-${pi}`);
+      nodes.push(...formatted.map((n, idx) =>
+        typeof n === 'string' ? <React.Fragment key={`t-${si}-${pi}-${idx}`}>{n}</React.Fragment> : n
+      ));
+    });
+  });
+
+  return <>{nodes}</>;
+}
 
 // A lightweight, highly robust regex-based Markdown & Math renderer
 export default function MarkdownRenderer({ content, isAi }) {
