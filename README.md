@@ -175,62 +175,7 @@ Generate **full-length board-pattern papers** on demand with a smart duration-ba
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
 
-## 🚀 Getting Started
 
-### Prerequisites
-- Node.js ≥ 18
-- A [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster
-- A Redis Cache server (Upstash Cloud or local RedVER engine)
-- A [Google Gemini API key](https://ai.google.dev)
-
-### 1️⃣ Clone the repository
-```bash
-git clone https://github.com/hashirR786/walrus-study.git
-cd walrus-study
-```
-
-### 2️⃣ Install frontend dependencies
-```bash
-npm install
-```
-
-### 3️⃣ Install backend dependencies
-```bash
-cd server
-npm install
-cd ..
-```
-
-### 4️⃣ Configure environment variables
-Create a `.env` file in the **root** of the project:
-```env
-MONGODB_URI=your_mongodb_atlas_connection_string
-GEMINI_API_KEY=your_google_gemini_api_key
-JWT_SECRET=your_super_secret_jwt_key
-PORT=5000
-REDIS_URL=redis://127.0.0.1:6379
-```
-
-### 5️⃣ Run the app
-
-Open **two terminals**:
-
-**Terminal 1 — Backend**
-```bash
-cd server
-npm run dev
-```
-
-**Terminal 2 — Frontend**
-```bash
-npm run dev
-```
-
-<div align="center">
-
-🎉 **The app will be live at [http://localhost:5173](http://localhost:5173)** 🎉
-
-</div>
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
 
@@ -275,15 +220,7 @@ walrus-study/
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
 
-## 🔑 Environment Variables
 
-| Variable | Description | Required |
-|:---------|:-------------|:--------:|
-| `MONGODB_URI` | MongoDB Atlas connection string | ✅ |
-| `GEMINI_API_KEY` | Google Gemini API key | ✅ |
-| `JWT_SECRET` | Secret key for JWT signing | ✅ |
-| `REDIS_URL` | Redis connection URL (`redis://` or `rediss://`) | ✅ |
-| `PORT` | Backend server port (default: 5000) | ❌ |
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=0:4285F4,100:47A248&height=3&section=header" width="100%"/>
 
