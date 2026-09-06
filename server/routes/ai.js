@@ -75,7 +75,35 @@ async function callGroqAPI(messages, temperature = 0.2, responseFormat = null, m
   return data.choices[0].message.content;
 }
 
-// Utility to contact Google Gemini 2.5 Flash via REST — with 8s abort timeout
+// Groq chat/doubt-solver call — uses llama-3.3-70b-versatile (fast, high TPM, no reasoning overhead)
+// This is separate from callGroqAPI which is reserved for JSON-mode test generation with the reasoning model.
+async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
+
+  const payload = {
+    model: 'llama-3.3-70b-versatile',
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+  };
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Groq Chat API status ${response.status}`);
+  }
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
+
+// Utility to contact Google Gemini 2.0 Flash via REST — with 8s abort timeout
 async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temperature = 0.2, timeoutMs = 8000) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not defined');
@@ -116,7 +144,7 @@ async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temper
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal }
     );
 
@@ -164,7 +192,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     console.error('RedVER read error for /solve:', err);
   }
 
-  // ── Try Gemini 1.5 Flash first ─────────────────────────────────────────────
+  // ── Try Gemini 2.0 Flash first (stable, fast) ─────────────────────────────
   try {
     const reply = await callGeminiAPI(
       SYSTEM_PROMPT,
@@ -173,7 +201,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       0.2
     );
     console.log('✅ Gemini answered successfully');
-    const successResponse = { response: reply, model: 'gemini-2.5-flash' };
+    const successResponse = { response: reply, model: 'gemini-2.0-flash' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
@@ -184,16 +212,16 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     console.warn('⚠️  Gemini failed, trying Groq fallback:', geminiError.message);
   }
 
-  // ── Groq fallback ──────────────────────────────────────────────────────────
+  // ── Groq fallback — llama-3.3-70b-versatile (fast, generous token limit) ──
   try {
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...chatHistory.slice(-6),
       { role: 'user', content: userPrompt }
     ];
-    const reply = await callGroqAPI(messages, 0.2, null, 2500);
-    console.log('✅ Groq fallback answered successfully');
-    const successResponse = { response: reply, model: 'groq-gpt-oss' };
+    const reply = await callGroqChatAPI(messages, 0.3, 4096);
+    console.log('✅ Groq fallback answered successfully (llama-3.3-70b)');
+    const successResponse = { response: reply, model: 'groq-llama-70b' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
