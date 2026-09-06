@@ -75,14 +75,14 @@ async function callGroqAPI(messages, temperature = 0.2, responseFormat = null, m
   return data.choices[0].message.content;
 }
 
-// Groq chat/doubt-solver call — uses llama-3.3-70b-versatile (fast, high TPM, no reasoning overhead)
-// This is separate from callGroqAPI which is reserved for JSON-mode test generation with the reasoning model.
+// Groq chat/doubt-solver — PRIMARY model: qwen/qwen3.6-27b
+// Recommended Groq replacement for llama-3.3-70b-versatile (deprecated Aug 16, 2026)
 async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
 
   const payload = {
-    model: 'llama-3.3-70b-versatile',
+    model: 'qwen/qwen3.6-27b',
     messages,
     temperature,
     max_tokens: maxTokens,
@@ -103,8 +103,8 @@ async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
 }
 
 
-// Utility to contact Google Gemini 3.8 Flash via REST — with 15s abort timeout
-async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temperature = 0.2, timeoutMs = 15000) {
+// Utility to contact Google Gemini 2.5 Flash via REST — FALLBACK with 20s abort timeout
+async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temperature = 0.2, timeoutMs = 20000) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not defined');
 
@@ -144,7 +144,7 @@ async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temper
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal }
     );
 
@@ -192,27 +192,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     console.error('RedVER read error for /solve:', err);
   }
 
-  // ── Try Gemini 2.0 Flash first (stable, fast) ─────────────────────────────
-  try {
-    const reply = await callGeminiAPI(
-      SYSTEM_PROMPT,
-      chatHistory.slice(-8), // Gemini supports large context — send last 8 turns
-      userPrompt,
-      0.2
-    );
-    console.log('✅ Gemini answered successfully');
-    const successResponse = { response: reply, model: 'gemini-3.8-flash' };
-    try {
-      await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
-    } catch (e) {
-      console.warn('RedVER write error for /solve:', e.message);
-    }
-    return res.json(successResponse);
-  } catch (geminiError) {
-    console.warn('⚠️  Gemini failed, trying Groq fallback:', geminiError.message);
-  }
-
-  // ── Groq fallback — llama-3.3-70b-versatile (fast, generous token limit) ──
+  // ── PRIMARY: Groq — qwen/qwen3.6-27b (fast, available on free tier) ─────────────
   try {
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -220,8 +200,8 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       { role: 'user', content: userPrompt }
     ];
     const reply = await callGroqChatAPI(messages, 0.3, 4096);
-    console.log('✅ Groq fallback answered successfully (llama-3.3-70b-versatile)');
-    const successResponse = { response: reply, model: 'groq-llama-70b' };
+    console.log('✅ Groq answered successfully (qwen/qwen3.6-27b)');
+    const successResponse = { response: reply, model: 'groq-qwen-27b' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
@@ -229,7 +209,27 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     }
     return res.json(successResponse);
   } catch (groqError) {
-    console.warn('⚠️  Groq also failed, returning static fallback:', groqError.message);
+    console.warn('⚠️  Groq failed, trying Gemini fallback:', groqError.message);
+  }
+
+  // ── FALLBACK: Gemini 2.5 Flash (20s timeout) ────────────────────────────
+  try {
+    const reply = await callGeminiAPI(
+      SYSTEM_PROMPT,
+      chatHistory.slice(-8),
+      userPrompt,
+      0.2
+    );
+    console.log('✅ Gemini fallback answered successfully');
+    const successResponse = { response: reply, model: 'gemini-2.5-flash' };
+    try {
+      await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
+    } catch (e) {
+      console.warn('RedVER write error for /solve:', e.message);
+    }
+    return res.json(successResponse);
+  } catch (geminiError) {
+    console.warn('⚠️  Gemini also failed, returning static fallback:', geminiError.message);
   }
 
   // ── Static offline fallback ────────────────────────────────────────────────
