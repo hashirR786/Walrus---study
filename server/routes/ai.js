@@ -82,7 +82,7 @@ async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
   if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
 
   const payload = {
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama3-70b-8192',
     messages,
     temperature,
     max_tokens: maxTokens,
@@ -103,7 +103,7 @@ async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
 }
 
 
-// Utility to contact Google Gemini 2.0 Flash via REST — with 8s abort timeout
+// Utility to contact Google Gemini 3.6 Flash via REST — with 8s abort timeout
 async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temperature = 0.2, timeoutMs = 8000) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not defined');
@@ -144,7 +144,7 @@ async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temper
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal }
     );
 
@@ -201,7 +201,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       0.2
     );
     console.log('✅ Gemini answered successfully');
-    const successResponse = { response: reply, model: 'gemini-2.0-flash' };
+    const successResponse = { response: reply, model: 'gemini-3.6-flash' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
@@ -220,7 +220,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       { role: 'user', content: userPrompt }
     ];
     const reply = await callGroqChatAPI(messages, 0.3, 4096);
-    console.log('✅ Groq fallback answered successfully (llama-3.3-70b)');
+    console.log('✅ Groq fallback answered successfully (llama3-70b-8192)');
     const successResponse = { response: reply, model: 'groq-llama-70b' };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
