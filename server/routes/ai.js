@@ -4,6 +4,13 @@ import { safeCache } from '../config/cache.js';
 
 const router = express.Router();
 
+// Strip <think>...</think> chain-of-thought blocks that Qwen/DeepSeek reasoning models emit.
+// These are internal reasoning traces and must never be shown to users.
+function stripThinkTags(text) {
+  if (!text) return text;
+  // Remove all <think>...</think> blocks (greedy, multiline, case-insensitive)
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^\s+/, '').trim();
+}
 
 const SYSTEM_PROMPT = `You are an expert AI tutor and academic assistant for Indian students in CBSE Grades 11 and 12. Your knowledge spans: Physics, Chemistry, Mathematics, Biology, Accountancy, Business Studies, Economics, History, Political Science, Geography, English Core, Computer Science, and Informatics Practices.
 
@@ -72,7 +79,7 @@ async function callGroqAPI(messages, temperature = 0.2, responseFormat = null, m
     throw new Error(errorData.error?.message || `Groq API status ${response.status}`);
   }
   const data = await response.json();
-  return data.choices[0].message.content;
+  return stripThinkTags(data.choices[0].message.content);
 }
 
 // Groq chat/doubt-solver — PRIMARY model: qwen/qwen3.6-27b
@@ -86,6 +93,8 @@ async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
     messages,
     temperature,
     max_tokens: maxTokens,
+    // Disable Qwen's chain-of-thought mode — we strip <think> tags as backup too
+    thinking: false,
   };
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -99,7 +108,7 @@ async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
     throw new Error(errorData.error?.message || `Groq Chat API status ${response.status}`);
   }
   const data = await response.json();
-  return data.choices[0].message.content;
+  return stripThinkTags(data.choices[0].message.content);
 }
 
 

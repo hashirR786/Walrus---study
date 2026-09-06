@@ -401,7 +401,9 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
       });
 
       const data = await res.json();
-      const aiMsg = { role: 'ai', content: data.response, timestamp: new Date().toISOString() };
+      // Strip any <think>...</think> reasoning traces from Qwen/DeepSeek models before display
+      const cleanResponse = (data.response || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      const aiMsg = { role: 'ai', content: cleanResponse, timestamp: new Date().toISOString() };
       const finalMessages = [...withUser, aiMsg];
       setMessages(finalMessages);
 
