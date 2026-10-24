@@ -1,6 +1,15 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+// The identity for a request always comes from the verified JWT -- never from a
+// client-supplied body field or query string. Every route that needs to know who
+// is calling must go through this helper.
+// _id is stringified because the existing documents store userId as a String.
+export const identityOf = (req) => ({
+  userId: req.user._id.toString(),
+  username: req.user.username,
+});
+
 export const protect = async (req, res, next) => {
   let token;
 

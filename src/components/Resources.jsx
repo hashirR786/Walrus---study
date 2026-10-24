@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BookOpen, FileText, Download, Sparkles, RefreshCw } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
-import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 const CHAPTERS_PRESET = {
   Physics: ['Electric Charges and Fields', 'Electrostatic Potential and Capacitance', 'Current Electricity', 'Moving Charges and Magnetism', 'Magnetism and Matter', 'Ray Optics and Wave Optics'],
@@ -39,7 +39,7 @@ export default function Resources({ onActivityTriggered, allowedSubjects }) {
     if (!chapter) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/ai/generate-notes`, {
+      const res = await apiFetch(`/ai/generate-notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, chapter })

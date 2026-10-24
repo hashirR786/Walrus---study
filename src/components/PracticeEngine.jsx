@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Timer, Award, Layers, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Zap, RotateCcw, Sparkles, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import MarkdownRenderer, { LatexText } from './MarkdownRenderer';
-import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
@@ -197,7 +197,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     if (!user?._id) return;
     setHistoryLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/student/tests?userId=${user._id}`);
+      const res = await apiFetch(`/student/tests`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) setTestHistory(data);
@@ -237,11 +237,10 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
   const triggerViolation = async (reason) => {
     if (!testActive) return;
     try {
-      const res = await fetch(`${API_BASE}/student/exam/warning`, {
+      const res = await apiFetch(`/student/exam/warning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: user?._id || 'anonymous',
           examId: currentPaper?._id || currentPaper?.title || 'mock-exam',
           durationMinutes: testDuration
         })
@@ -417,7 +416,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setErrorAnalysis(null);
     setStudentAnswers({});
     try {
-      const res = await fetch(`${API_BASE}/ai/generate-test`, {
+      const res = await apiFetch(`/ai/generate-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, chapter, duration: testDuration })
@@ -439,7 +438,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setViolationWarning(null);
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/ai/evaluate-test`, {
+      const res = await apiFetch(`/ai/evaluate-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: currentPaper.subject, generatedPaper: currentPaper, answers: studentAnswers })
@@ -466,7 +465,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setIsAnalyzingErrors(true);
     setErrorAnalysis(null);
     try {
-      const res = await fetch(`${API_BASE}/ai/analyze-errors`, {
+      const res = await apiFetch(`/ai/analyze-errors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -499,7 +498,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setQpAnswers({});
     setQpRevealed({});
     try {
-      const res = await fetch(`${API_BASE}/ai/quick-practice`, {
+      const res = await apiFetch(`/ai/quick-practice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -525,7 +524,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
 
   const fetchFlashcards = async () => {
     try {
-      const res = await fetch(`${API_BASE}/student/flashcards?userId=${userId}`);
+      const res = await apiFetch(`/student/flashcards`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       if (data && data.length > 0) {
@@ -643,7 +642,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
 
     if (!isLocalOnly) {
       try {
-        const res = await fetch(`${API_BASE}/student/flashcards/review`, {
+        const res = await apiFetch(`/student/flashcards/review`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardId, passed })
@@ -679,7 +678,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     const isLocalOnly = cardId.startsWith('seed-') || cardId.startsWith('offline-') || cardId.startsWith('mock-ai-');
     if (!isLocalOnly) {
       try {
-        const res = await fetch(`${API_BASE}/student/flashcards/${cardId}`, {
+        const res = await apiFetch(`/student/flashcards/${cardId}`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed to delete card');
@@ -705,7 +704,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     };
 
     try {
-      const res = await fetch(`${API_BASE}/student/flashcards`, {
+      const res = await apiFetch(`/student/flashcards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCardPayload)
@@ -735,11 +734,10 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     const activeCh = fcChapter === 'All Chapters' ? chaptersForSubject[0] || 'General' : fcChapter;
     setIsGeneratingCards(true);
     try {
-      const res = await fetch(`${API_BASE}/ai/generate-flashcards`, {
+      const res = await apiFetch(`/ai/generate-flashcards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           subject,
           chapter: activeCh
         })
@@ -1117,7 +1115,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
                       enterFullscreenWithGrace();
                       // Reset server-side warning counter for this exam session
                       try {
-                        await fetch(`${API_BASE}/student/exam/warning/reset`, {
+                        await apiFetch(`/student/exam/warning/reset`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({

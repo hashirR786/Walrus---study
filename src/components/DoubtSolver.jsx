@@ -5,7 +5,7 @@ import {
   Mic, MicOff, History, Plus, Trash2, ChevronLeft, X, Clock, SlidersHorizontal
 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
-import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 const SUBJECTS_LIST = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
@@ -120,7 +120,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
   const fetchSessions = useCallback(async () => {
     if (!user?.username) return;
     try {
-      const res = await fetch(`${API_BASE}/student/chat-sessions?username=${encodeURIComponent(user.username)}`);
+      const res = await apiFetch(`/student/chat-sessions`);
       const data = await res.json();
       if (Array.isArray(data)) setSessions(data);
     } catch { /* offline */ }
@@ -139,7 +139,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     const restoreActiveChatFromRedVER = async () => {
       if (!user?.username) return;
       try {
-        const res = await fetch(`${API_BASE}/student/chat-sessions/active?username=${encodeURIComponent(user.username)}`);
+        const res = await apiFetch(`/student/chat-sessions/active`);
         const session = await res.json();
         if (session) {
           console.log("⚡ Restored active chat workspace from RedVER cache!");
@@ -166,11 +166,10 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     if (msgs.filter(m => m.role === 'user').length === 0) return null;
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/student/chat-sessions`, {
+      const res = await apiFetch(`/student/chat-sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: user.username,
           subject: subj, chapter: chap, mode: mod,
           messages: msgs.map(m => ({ role: m.role, content: m.content })),
           sessionId: sessId || undefined
@@ -245,10 +244,10 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     setShowHeader(true);
 
     if (user?.username) {
-      fetch(`${API_BASE}/student/chat-sessions/active/clear`, {
+      apiFetch(`/student/chat-sessions/active/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username })
+        body: JSON.stringify({})
       }).catch(err => console.warn('Failed to clear active session cache in RedVER:', err));
     }
   };
@@ -268,7 +267,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
     setShowHeader(true);
 
     if (user?.username) {
-      fetch(`${API_BASE}/student/chat-sessions/active`, {
+      apiFetch(`/student/chat-sessions/active`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -283,7 +282,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
   const deleteSession = async (id, e) => {
     e.stopPropagation();
     try {
-      await fetch(`${API_BASE}/student/chat-sessions/${id}`, { method: 'DELETE' });
+      await apiFetch(`/student/chat-sessions/${id}`, { method: 'DELETE' });
       setSessions(prev => prev.filter(s => s._id !== id));
       if (currentSessionId === id) startNewSession();
     } catch { /* offline */ }
@@ -354,7 +353,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
   const handleTranscribe = async (base64Audio) => {
     setIsTranscribing(true);
     try {
-      const res = await fetch(`${API_BASE}/ai/transcribe`, {
+      const res = await apiFetch(`/ai/transcribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audio: base64Audio })
@@ -394,7 +393,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
         .filter(m => m.role !== 'system')
         .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }));
 
-      const res = await fetch(`${API_BASE}/ai/solve`, {
+      const res = await apiFetch(`/ai/solve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: snapSubject, chapter: snapChapter, mode: snapMode, studentInput: currentInput, studentAttempt: currentAttempt, chatHistory })

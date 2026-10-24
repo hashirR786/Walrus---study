@@ -25,6 +25,12 @@ const SharedNoteSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // Set from the authenticated user on create; used for delete authorization.
+  // Empty on documents created before this field existed.
+  ownerId: {
+    type: String,
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, MessageSquare, Link as LinkIcon, ThumbsUp, Send, Library, Trash2, X, AlertTriangle, Download, ZoomIn } from 'lucide-react';
-import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 // Inline confirmation dialog component (replaces window.confirm)
 function ConfirmDialog({ message, onConfirm, onCancel }) {
@@ -125,7 +125,7 @@ export default function Community({ progressData, user }) {
   // ── Doubt Forum ──────────────────────────────────────────────────────────────
   const fetchThreads = async () => {
     try {
-      const res = await fetch(`${API_BASE}/student/forum`);
+      const res = await apiFetch(`/student/forum`);
       setThreads(await res.json());
     } catch { /* offline */ }
   };
@@ -134,14 +134,13 @@ export default function Community({ progressData, user }) {
     e.preventDefault();
     if (!newThreadTitle.trim() || !newThreadContent.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/student/forum`, {
+      const res = await apiFetch(`/student/forum`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newThreadTitle,
           content: newThreadContent,
-          subject: newThreadSubject,
-          askedBy: user?.username || 'Student'
+          subject: newThreadSubject
         })
       });
       const t = await res.json();
@@ -155,10 +154,10 @@ export default function Community({ progressData, user }) {
     e.preventDefault();
     if (!replyContent.trim() || !selectedThread) return;
     try {
-      const res = await fetch(`${API_BASE}/student/forum/${selectedThread._id}/answer`, {
+      const res = await apiFetch(`/student/forum/${selectedThread._id}/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answeredBy: user?.username || 'Student', content: replyContent, isAI: false })
+        body: JSON.stringify({ content: replyContent, isAI: false })
       });
       const updated = await res.json();
       setThreads(prev => prev.map(t => t._id === updated._id ? updated : t));
@@ -170,7 +169,7 @@ export default function Community({ progressData, user }) {
   const handleUpvoteAnswer = async (answerId) => {
     if (!selectedThread) return;
     try {
-      const res = await fetch(`${API_BASE}/student/forum/${selectedThread._id}/answer/${answerId}/upvote`, { method: 'POST' });
+      const res = await apiFetch(`/student/forum/${selectedThread._id}/answer/${answerId}/upvote`, { method: 'POST' });
       const updated = await res.json();
       setThreads(prev => prev.map(t => t._id === updated._id ? updated : t));
       setSelectedThread(updated);
@@ -180,7 +179,7 @@ export default function Community({ progressData, user }) {
   const doDeleteThread = async (id) => {
     dismissConfirm();
     try {
-      const res = await fetch(`${API_BASE}/student/forum/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/student/forum/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setThreads(prev => prev.filter(t => t._id !== id));
         if (selectedThread?._id === id) setSelectedThread(null);
@@ -202,7 +201,7 @@ export default function Community({ progressData, user }) {
   // ── Notes Sharing ────────────────────────────────────────────────────────────
   const fetchNotes = async () => {
     try {
-      const res = await fetch(`${API_BASE}/student/notes`);
+      const res = await apiFetch(`/student/notes`);
       setSharedNotes(await res.json());
     } catch { /* offline */ }
   };
@@ -220,13 +219,13 @@ export default function Community({ progressData, user }) {
     e.preventDefault();
     if (!newNoteTitle.trim()) { alert('Please provide a title.'); return; }
     try {
-      const res = await fetch(`${API_BASE}/student/notes`, {
+      const res = await apiFetch(`/student/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newNoteTitle, subject: newNoteSubject,
           description: newNoteDescription, link: newNoteLink,
-          image: newNoteImage, author: user?.username || 'Student'
+          image: newNoteImage
         })
       });
       if (res.ok) {
@@ -242,7 +241,7 @@ export default function Community({ progressData, user }) {
   const doDeleteNote = async (id) => {
     dismissConfirm();
     try {
-      const res = await fetch(`${API_BASE}/student/notes/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/student/notes/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setSharedNotes(prev => prev.filter(n => n._id !== id));
       } else {
@@ -264,10 +263,10 @@ export default function Community({ progressData, user }) {
     const { username, status, subject } = presenceRef.current;
     if (!username) return;
     try {
-      await fetch(`${API_BASE}/student/studyroom/heartbeat`, {
+      await apiFetch(`/student/studyroom/heartbeat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, status, focusSubject: subject })
+        body: JSON.stringify({ status, focusSubject: subject })
       });
     } catch { /* offline */ }
   };
@@ -275,24 +274,24 @@ export default function Community({ progressData, user }) {
   const leaveRoom = async () => {
     if (!user?.username) return;
     try {
-      await fetch(`${API_BASE}/student/studyroom/leave`, {
+      await apiFetch(`/student/studyroom/leave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username })
+        body: JSON.stringify({})
       });
     } catch { /* offline */ }
   };
 
   const fetchOnlineUsers = async () => {
     try {
-      const res = await fetch(`${API_BASE}/student/studyroom/users`);
+      const res = await apiFetch(`/student/studyroom/users`);
       setOnlineUsers(await res.json());
     } catch { /* offline */ }
   };
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`${API_BASE}/student/studyroom/messages`);
+      const res = await apiFetch(`/student/studyroom/messages`);
       setMessages(await res.json());
     } catch { /* offline */ }
   };
@@ -301,10 +300,10 @@ export default function Community({ progressData, user }) {
     e.preventDefault();
     if (!newMessageText.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/student/studyroom/messages`, {
+      const res = await apiFetch(`/student/studyroom/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: user?.username || 'Student', text: newMessageText })
+        body: JSON.stringify({ text: newMessageText })
       });
       if (res.ok) {
         const msg = await res.json();

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User as UserIcon, Camera, Trophy, Sparkles, CheckSquare, Target, Settings, Flame, Loader2 } from 'lucide-react';
-import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -17,9 +17,7 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
   React.useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const res = await fetch(`${API_BASE}/student/progress?userId=${user?._id || 'default-student'}`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
+        const res = await apiFetch(`/student/progress`);
         if (!res.ok) throw new Error('Failed to retrieve tasks');
         const data = await res.json();
         // Extract study tasks or all tasks if we have them
@@ -90,12 +88,9 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
 
     try {
       setSaving(true);
-      const res = await fetch(`${API_BASE}/auth/profile`, {
+      const res = await apiFetch(`/auth/profile`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: editedUsername.trim(),
           avatar: editedAvatar,

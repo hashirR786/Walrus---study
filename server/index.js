@@ -15,6 +15,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+// Refuse to start without a signing secret. Previously the token signer fell back
+// to a hardcoded string while the verifier did not, so a missing JWT_SECRET meant
+// either every request 401'd or tokens were signed with a publicly known value.
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set. Refusing to start.');
+  console.error('Set it in .env (local) or in the Render dashboard (production).');
+  process.exit(1);
+}
+if (process.env.JWT_SECRET.length < 32) {
+  console.warn('WARNING: JWT_SECRET is shorter than 32 characters. Use a longer random string.');
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 

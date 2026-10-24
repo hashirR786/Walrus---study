@@ -21,6 +21,12 @@ const DoubtForumSchema = new mongoose.Schema({
     type: String,
     default: 'Student'
   },
+  // Set from the authenticated user on create; used for delete authorization.
+  // Empty on documents created before this field existed.
+  ownerId: {
+    type: String,
+    default: ''
+  },
   answers: [{
     answeredBy: { type: String, default: 'Peer' },
     content: { type: String, required: true },

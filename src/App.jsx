@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Menu } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import DoubtSolver from './components/DoubtSolver';
@@ -12,7 +12,7 @@ import Auth from './components/Auth';
 import ProfileView from './components/ProfileView';
 import Tutorial from './components/Tutorial';
 import StreamSetup from './components/StreamSetup';
-import { API_BASE } from './config';
+import { apiFetch, setUnauthorizedHandler } from './api';
 
 
 const OFFLINE_SYLLABUS = [
@@ -177,9 +177,7 @@ export default function App() {
     setIsLoading(true);
     const userId = user?._id || 'default-student';
     try {
-      const res = await fetch(`${API_BASE}/student/progress?userId=${userId}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      const res = await apiFetch(`/student/progress`);
       if (!res.ok) throw new Error('Failed to load profile');
       const data = await res.json();
       setProgressData(data);
@@ -227,7 +225,7 @@ export default function App() {
     // Note: if they already have a non-general stream saved in DB, they won't see it (handled via needsStreamSetup)
   };
 
-  const handleLogout = () => {
+  const clearSession = () => {
     setToken(null);
     setUser(null);
     setProgressData(null);
@@ -243,9 +241,32 @@ export default function App() {
     localStorage.removeItem('walrus_study_schedule');  // Planner AI schedule
     localStorage.removeItem('walrus_active_test');     // Practice Engine in-progress test
     localStorage.removeItem('walrus_tutorial_steps'); // Tutorial completion state
+  };
 
+  const handleLogout = () => {
+    clearSession();
     addToast('Logged out successfully', 'success');
   };
+
+  // The /student and /ai routers now reject requests without a valid token, so a
+  // 401 from anywhere means this session is over. Drop back to the sign-in screen
+  // instead of leaving a dashboard on screen that can no longer load anything.
+  const handleSessionExpired = () => {
+    clearSession();
+    addToast('Your session has expired. Please sign in again.', 'warning');
+  };
+
+  // Registered once, but invoked through a ref so it is never a stale closure.
+  const sessionExpiredRef = useRef(handleSessionExpired);
+
+  useEffect(() => {
+    sessionExpiredRef.current = handleSessionExpired;
+  });
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => sessionExpiredRef.current());
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const handleUpdateUser = (updatedUserData) => {
     const newUser = { ...user, ...updatedUserData };
@@ -269,13 +290,10 @@ export default function App() {
 
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/student/progress/chapter`, {
+      const res = await apiFetch(`/student/progress/chapter`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify({ userId, subjectName, chapterName, status: newStatus })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subjectName, chapterName, status: newStatus })
       });
       const data = await res.json();
       setProgressData(data);
@@ -298,13 +316,10 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/student/progress/goal`, {
+      const res = await apiFetch(`/student/progress/goal`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify({ userId, taskName, completed })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskName, completed })
       });
       const data = await res.json();
       setProgressData(data);
@@ -330,13 +345,10 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/student/progress/study-time`, {
+      const res = await apiFetch(`/student/progress/study-time`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify({ userId, minutes })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minutes })
       });
       const data = await res.json();
       setProgressData(data);
@@ -366,13 +378,10 @@ export default function App() {
     }
 
     try {
-      await fetch(`${API_BASE}/student/tests`, {
+      await apiFetch(`/student/tests`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify({ userId, ...testResult })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testResult)
       });
       fetchProfile();
     } catch (err) {
@@ -408,7 +417,6 @@ export default function App() {
       <>
         <StreamSetup
           user={user}
-          token={token}
           onComplete={(updatedUser) => {
             handleUpdateUser(updatedUser);
             // Mark as configured so we don't show again

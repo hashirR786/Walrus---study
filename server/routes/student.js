@@ -8,8 +8,13 @@ import User from '../models/User.js';
 import ChatSession from '../models/ChatSession.js';
 import Flashcard from '../models/Flashcard.js';
 import { safeCache } from '../config/cache.js';
+import { protect, identityOf } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Every student route requires a valid token. Identity is read from the verified
+// JWT via identityOf(req) -- userId/username in the body or query are ignored.
+router.use(protect);
 
 const DEFAULT_SYLLABUS = [
   {
@@ -148,7 +153,7 @@ const calculateStreak = (streak) => {
 
 // 1. Get/Initialize Student Profile
 router.get('/progress', async (req, res) => {
-  const userId = req.query.userId || 'default-student';
+  const { userId } = identityOf(req);
   try {
     let progress = await UserProgress.findOne({ userId });
     
@@ -186,7 +191,8 @@ router.get('/progress', async (req, res) => {
 
 // 2. Update Chapter checklist status
 router.post('/progress/chapter', async (req, res) => {
-  const { userId = 'default-student', subjectName, chapterName, status, masteryScore } = req.body;
+  const { userId } = identityOf(req);
+  const { subjectName, chapterName, status, masteryScore } = req.body;
 
   try {
     let progress = await UserProgress.findOne({ userId });
@@ -222,7 +228,8 @@ router.post('/progress/chapter', async (req, res) => {
 
 // 3. Add daily study minutes
 router.post('/progress/study-time', async (req, res) => {
-  const { userId = 'default-student', minutes } = req.body;
+  const { userId } = identityOf(req);
+  const { minutes } = req.body;
   const todayStr = new Date().toISOString().split('T')[0];
 
   try {
@@ -248,7 +255,8 @@ router.post('/progress/study-time', async (req, res) => {
 
 // 4. Toggle Daily Goal completion
 router.post('/progress/goal', async (req, res) => {
-  const { userId = 'default-student', taskName, completed } = req.body;
+  const { userId } = identityOf(req);
+  const { taskName, completed } = req.body;
 
   try {
     const progress = await UserProgress.findOne({ userId });
@@ -268,7 +276,7 @@ router.post('/progress/goal', async (req, res) => {
 
 // 5. Reset Daily Goals (used daily or when streak starts fresh)
 router.post('/progress/reset-goals', async (req, res) => {
-  const { userId = 'default-student' } = req.body;
+  const { userId } = identityOf(req);
   try {
     const progress = await UserProgress.findOne({ userId });
     if (!progress) return res.status(404).json({ error: 'Profile not found' });
@@ -283,7 +291,7 @@ router.post('/progress/reset-goals', async (req, res) => {
 
 // 6. Get Mock Tests history
 router.get('/tests', async (req, res) => {
-  const userId = req.query.userId || 'default-student';
+  const { userId } = identityOf(req);
   try {
     const tests = await MockTest.find({ userId }).sort({ attemptedAt: -1 });
     return res.json(tests);
@@ -294,7 +302,8 @@ router.get('/tests', async (req, res) => {
 
 // 7. Save completed Mock Test
 router.post('/tests', async (req, res) => {
-  const { userId = 'default-student', subject, testType, chapter, generatedPaper, answers, score, totalMarks, feedback } = req.body;
+  const { userId } = identityOf(req);
+  const { subject, testType, chapter, generatedPaper, answers, score, totalMarks, feedback } = req.body;
 
   try {
     const newTest = new MockTest({
@@ -345,7 +354,8 @@ router.get('/forum', async (req, res) => {
 
 // 9. Create Forum Thread
 router.post('/forum', async (req, res) => {
-  const { title, content, subject, chapter, askedBy } = req.body;
+  const { userId, username } = identityOf(req);
+  const { title, content, subject, chapter } = req.body;
 
   try {
     const thread = new DoubtForum({
@@ -353,7 +363,8 @@ router.post('/forum', async (req, res) => {
       content,
       subject,
       chapter: chapter || 'General',
-      askedBy: askedBy || 'Student'
+      askedBy: username,
+      ownerId: userId
     });
     await thread.save();
     return res.json(thread);
@@ -365,14 +376,15 @@ router.post('/forum', async (req, res) => {
 // 10. Post Answer to Forum thread
 router.post('/forum/:id/answer', async (req, res) => {
   const { id } = req.params;
-  const { answeredBy, content, isAI } = req.body;
+  const { username } = identityOf(req);
+  const { content, isAI } = req.body;
 
   try {
     const thread = await DoubtForum.findById(id);
     if (!thread) return res.status(404).json({ error: 'Thread not found' });
 
     thread.answers.push({
-      answeredBy: answeredBy || 'Peer',
+      answeredBy: username,
       content,
       isAI: !!isAI,
       upvotes: 0
@@ -408,9 +420,19 @@ router.post('/forum/:id/answer/:answerId/upvote', async (req, res) => {
 // 12. Delete Forum Thread
 router.delete('/forum/:id', async (req, res) => {
   const { id } = req.params;
+  const { userId, username } = identityOf(req);
   try {
-    const thread = await DoubtForum.findByIdAndDelete(id);
+    const thread = await DoubtForum.findById(id);
     if (!thread) return res.status(404).json({ error: 'Thread not found' });
+
+    // Threads created before ownerId existed fall back to the display name, which
+    // is the only owner record they have.
+    const isOwner = thread.ownerId ? thread.ownerId === userId : thread.askedBy === username;
+    if (!isOwner) {
+      return res.status(403).json({ error: 'You can only delete your own threads' });
+    }
+
+    await thread.deleteOne();
     return res.json({ message: 'Thread deleted successfully' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -429,10 +451,11 @@ router.get('/notes', async (req, res) => {
 
 // 14. Create shared note
 router.post('/notes', async (req, res) => {
-  const { title, subject, description, link, image, author } = req.body;
+  const { userId, username } = identityOf(req);
+  const { title, subject, description, link, image } = req.body;
   try {
-    if (!title || !subject || !author) {
-      return res.status(400).json({ error: 'Title, subject, and author are required' });
+    if (!title || !subject) {
+      return res.status(400).json({ error: 'Title and subject are required' });
     }
     const note = new SharedNote({
       title,
@@ -440,7 +463,8 @@ router.post('/notes', async (req, res) => {
       description: description || '',
       link: link || '',
       image: image || '',
-      author
+      author: username,
+      ownerId: userId
     });
     await note.save();
     return res.json(note);
@@ -452,9 +476,17 @@ router.post('/notes', async (req, res) => {
 // 15. Delete shared note
 router.delete('/notes/:id', async (req, res) => {
   const { id } = req.params;
+  const { userId, username } = identityOf(req);
   try {
-    const note = await SharedNote.findByIdAndDelete(id);
+    const note = await SharedNote.findById(id);
     if (!note) return res.status(404).json({ error: 'Note not found' });
+
+    const isOwner = note.ownerId ? note.ownerId === userId : note.author === username;
+    if (!isOwner) {
+      return res.status(403).json({ error: 'You can only delete your own notes' });
+    }
+
+    await note.deleteOne();
     return res.json({ message: 'Note deleted successfully' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -473,12 +505,13 @@ router.get('/studyroom/messages', async (req, res) => {
 
 // 17. Post a study room message
 router.post('/studyroom/messages', async (req, res) => {
-  const { sender, text } = req.body;
+  const { username } = identityOf(req);
+  const { text } = req.body;
   try {
-    if (!sender || !text) {
-      return res.status(400).json({ error: 'Sender and text are required' });
+    if (!text) {
+      return res.status(400).json({ error: 'Text is required' });
     }
-    const message = new StudyRoomMessage({ sender, text });
+    const message = new StudyRoomMessage({ sender: username, text });
     await message.save();
     return res.json(message);
   } catch (error) {
@@ -488,8 +521,8 @@ router.post('/studyroom/messages', async (req, res) => {
 
 // 18. Heartbeat — called every ~20s by the frontend to mark user as online in study room
 router.post('/studyroom/heartbeat', async (req, res) => {
-  const { username, status, focusSubject } = req.body;
-  if (!username) return res.status(400).json({ error: 'username is required' });
+  const { username } = identityOf(req);
+  const { status, focusSubject } = req.body;
   try {
     // Key expires after 35 seconds — if client misses 1 ping it will still appear, but 2 misses = offline
     const presenceKey = `presence:studyroom:${username}`;
@@ -503,8 +536,7 @@ router.post('/studyroom/heartbeat', async (req, res) => {
 
 // 18b. Leave — explicitly remove presence key when user leaves the study room
 router.post('/studyroom/leave', async (req, res) => {
-  const { username } = req.body;
-  if (!username) return res.status(400).json({ error: 'username is required' });
+  const { username } = identityOf(req);
   try {
     await safeCache.del(`presence:studyroom:${username}`);
     return res.json({ ok: true });
@@ -537,8 +569,7 @@ router.get('/studyroom/users', async (req, res) => {
 
 // 19. Get all chat sessions for a student (most recent first)
 router.get('/chat-sessions', async (req, res) => {
-  const { username } = req.query;
-  if (!username) return res.status(400).json({ error: 'username query param required' });
+  const { username } = identityOf(req);
   try {
     const cacheKey = `student:chats:${username}`;
     const cachedData = await safeCache.get(cacheKey);
@@ -564,8 +595,9 @@ router.get('/chat-sessions', async (req, res) => {
 
 // 20. Save / create a chat session
 router.post('/chat-sessions', async (req, res) => {
-  const { username, subject, chapter, mode, messages, sessionId } = req.body;
-  if (!username || !messages) return res.status(400).json({ error: 'username and messages are required' });
+  const { username } = identityOf(req);
+  const { subject, chapter, mode, messages, sessionId } = req.body;
+  if (!messages) return res.status(400).json({ error: 'messages are required' });
   try {
     // Auto-generate title from first user message (max 60 chars)
     const firstUserMsg = messages.find(m => m.role === 'user');
@@ -575,12 +607,16 @@ router.post('/chat-sessions', async (req, res) => {
 
     let session;
     if (sessionId) {
-      // Update existing session
-      session = await ChatSession.findByIdAndUpdate(
-        sessionId,
-        { messages, updatedAt: new Date(), title: autoTitle },
-        { new: true }
-      );
+      // Update an existing session, but only if the caller owns it.
+      const existing = await ChatSession.findById(sessionId);
+      if (!existing) return res.status(404).json({ error: 'Session not found' });
+      if (existing.username !== username) {
+        return res.status(403).json({ error: 'Not authorized to modify this session' });
+      }
+      existing.messages = messages;
+      existing.updatedAt = new Date();
+      existing.title = autoTitle;
+      session = await existing.save();
     } else {
       // Create new session
       session = new ChatSession({
@@ -610,9 +646,14 @@ router.post('/chat-sessions', async (req, res) => {
 
 // 21. Delete a chat session
 router.delete('/chat-sessions/:id', async (req, res) => {
+  const { username } = identityOf(req);
   try {
-    const session = await ChatSession.findByIdAndDelete(req.params.id);
+    const session = await ChatSession.findById(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (session.username !== username) {
+      return res.status(403).json({ error: 'You can only delete your own sessions' });
+    }
+    await session.deleteOne();
 
     // Invalidate the sessions list cache
     const cacheKey = `student:chats:${session.username}`;
@@ -640,7 +681,7 @@ router.delete('/chat-sessions/:id', async (req, res) => {
 
 // 22. Get all flashcards for a user
 router.get('/flashcards', async (req, res) => {
-  const userId = req.query.userId || 'default-student';
+  const { userId } = identityOf(req);
   try {
     const flashcards = await Flashcard.find({ userId });
     return res.json(flashcards);
@@ -651,7 +692,8 @@ router.get('/flashcards', async (req, res) => {
 
 // 23. Add a custom manual flashcard
 router.post('/flashcards', async (req, res) => {
-  const { userId = 'default-student', subject, chapter, question, answer } = req.body;
+  const { userId } = identityOf(req);
+  const { subject, chapter, question, answer } = req.body;
   if (!subject || !chapter || !question || !answer) {
     return res.status(400).json({ error: 'Subject, chapter, question, and answer are required.' });
   }
@@ -666,6 +708,7 @@ router.post('/flashcards', async (req, res) => {
 
 // 24. Review a flashcard (Leitner system algorithm update)
 router.post('/flashcards/review', async (req, res) => {
+  const { userId } = identityOf(req);
   const { cardId, passed } = req.body;
   if (!cardId) {
     return res.status(400).json({ error: 'Card ID is required.' });
@@ -673,6 +716,9 @@ router.post('/flashcards/review', async (req, res) => {
   try {
     const card = await Flashcard.findById(cardId);
     if (!card) return res.status(404).json({ error: 'Flashcard not found.' });
+    if (card.userId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to review this card' });
+    }
 
     let nextBox = card.box;
     let daysToAdd = 1;
@@ -700,9 +746,14 @@ router.post('/flashcards/review', async (req, res) => {
 
 // 25. Delete a flashcard
 router.delete('/flashcards/:id', async (req, res) => {
+  const { userId } = identityOf(req);
   try {
-    const deleted = await Flashcard.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Flashcard not found.' });
+    const card = await Flashcard.findById(req.params.id);
+    if (!card) return res.status(404).json({ error: 'Flashcard not found.' });
+    if (card.userId !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own cards' });
+    }
+    await card.deleteOne();
     return res.json({ message: 'Flashcard deleted.' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -711,9 +762,10 @@ router.delete('/flashcards/:id', async (req, res) => {
 
 // 26. Track Strict Exam Mode Warnings (RedVER Cache)
 router.post('/exam/warning', async (req, res) => {
-  const { studentId, examId, durationMinutes } = req.body;
-  if (!studentId || !examId) {
-    return res.status(400).json({ error: 'studentId and examId are required.' });
+  const { userId: studentId } = identityOf(req);
+  const { examId, durationMinutes } = req.body;
+  if (!examId) {
+    return res.status(400).json({ error: 'examId is required.' });
   }
   const warningKey = `exam:warning:${studentId}:${examId}`;
   try {
@@ -737,9 +789,10 @@ router.post('/exam/warning', async (req, res) => {
 
 // 27. Reset/Clear warning count for a new exam session
 router.post('/exam/warning/reset', async (req, res) => {
-  const { studentId, examId } = req.body;
-  if (!studentId || !examId) {
-    return res.status(400).json({ error: 'studentId and examId are required.' });
+  const { userId: studentId } = identityOf(req);
+  const { examId } = req.body;
+  if (!examId) {
+    return res.status(400).json({ error: 'examId is required.' });
   }
   const warningKey = `exam:warning:${studentId}:${examId}`;
   try {
@@ -753,8 +806,7 @@ router.post('/exam/warning/reset', async (req, res) => {
 
 // 28. Get active chat session cache (RedVER)
 router.get('/chat-sessions/active', async (req, res) => {
-  const { username } = req.query;
-  if (!username) return res.status(400).json({ error: 'username query param required' });
+  const { username } = identityOf(req);
   try {
     const sessionCacheKey = `student:chats:active:${username}`;
     const cachedSession = await safeCache.get(sessionCacheKey);
@@ -770,8 +822,9 @@ router.get('/chat-sessions/active', async (req, res) => {
 
 // 29. Set active chat session cache (RedVER)
 router.post('/chat-sessions/active', async (req, res) => {
-  const { username, session } = req.body;
-  if (!username || !session) return res.status(400).json({ error: 'username and session are required' });
+  const { username } = identityOf(req);
+  const { session } = req.body;
+  if (!session) return res.status(400).json({ error: 'session is required' });
   try {
     const sessionCacheKey = `student:chats:active:${username}`;
     await safeCache.set(sessionCacheKey, JSON.stringify(session), { EX: 1800 });
@@ -784,8 +837,7 @@ router.post('/chat-sessions/active', async (req, res) => {
 
 // 30. Clear active chat session cache (RedVER)
 router.post('/chat-sessions/active/clear', async (req, res) => {
-  const { username } = req.body;
-  if (!username) return res.status(400).json({ error: 'username is required' });
+  const { username } = identityOf(req);
   try {
     const sessionCacheKey = `student:chats:active:${username}`;
     await safeCache.del(sessionCacheKey);

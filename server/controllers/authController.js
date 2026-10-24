@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 
 // Helper: Generate a JWT token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_key_123', {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '30d', // Session valid for 30 days
   });
 };

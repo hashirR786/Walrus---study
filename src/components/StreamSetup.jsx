@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, BookOpen, FlaskConical, Calculator, Leaf, TrendingUp, MonitorDot, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 const STREAMS = [
   {
@@ -50,7 +50,7 @@ const STREAMS = [
   },
 ];
 
-export default function StreamSetup({ user, token, onComplete }) {
+export default function StreamSetup({ user, onComplete }) {
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -58,12 +58,9 @@ export default function StreamSetup({ user, token, onComplete }) {
     if (!selected) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/profile`, {
+      const res = await apiFetch(`/auth/profile`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stream: selected }),
       });
       if (res.ok) {

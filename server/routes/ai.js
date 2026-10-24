@@ -1,8 +1,13 @@
 import express from 'express';
 import Flashcard from '../models/Flashcard.js';
 import { safeCache } from '../config/cache.js';
+import { protect, identityOf } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Every AI route requires a valid token. These endpoints spend real money on the
+// Groq and Gemini keys, so they must never be reachable anonymously.
+router.use(protect);
 
 // Strip <think>...</think> chain-of-thought blocks that Qwen/DeepSeek reasoning models emit.
 // These are internal reasoning traces and must never be shown to users.
@@ -960,7 +965,8 @@ router.post('/transcribe', async (req, res) => {
 
 // 9. Generate Flashcards for a specific subject and chapter
 router.post('/generate-flashcards', async (req, res) => {
-  const { userId = 'default-student', subject, chapter } = req.body;
+  const { userId } = identityOf(req);
+  const { subject, chapter } = req.body;
 
   if (!subject || !chapter) {
     return res.status(400).json({ error: 'Subject and chapter are required.' });
