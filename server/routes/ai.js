@@ -2,12 +2,16 @@ import express from 'express';
 import Flashcard from '../models/Flashcard.js';
 import { safeCache } from '../config/cache.js';
 import { protect, identityOf } from '../middleware/authMiddleware.js';
+import { aiLimiter, testGenerationLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
 // Every AI route requires a valid token. These endpoints spend real money on the
 // Groq and Gemini keys, so they must never be reachable anonymously.
 router.use(protect);
+
+// Then a per-user burst limit. Mounted after protect because it keys on req.user.
+router.use(aiLimiter);
 
 // Strip <think>...</think> chain-of-thought blocks that Qwen/DeepSeek reasoning models emit.
 // These are internal reasoning traces and must never be shown to users.
@@ -357,7 +361,7 @@ ${JSON.stringify(jsonTemplate, null, 2)}`;
 
 // 2. Generate Mock Paper — BATCHED (two parallel API calls merged server-side)
 // Scales dynamically based on testDuration: 30m = 15m, 60m = 25m, 120m = 50m, 180m = 80m
-router.post('/generate-test', async (req, res) => {
+router.post('/generate-test', testGenerationLimiter, async (req, res) => {
   const { subject, chapter, duration = 60 } = req.body;
   if (!subject) return res.status(400).json({ error: 'Subject is required.' });
 

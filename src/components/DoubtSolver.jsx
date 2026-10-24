@@ -5,7 +5,7 @@ import {
   Mic, MicOff, History, Plus, Trash2, ChevronLeft, X, Clock, SlidersHorizontal
 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
-import { apiFetch } from '../api';
+import { apiFetch, apiJson } from '../api';
 
 const SUBJECTS_LIST = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
@@ -393,13 +393,11 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
         .filter(m => m.role !== 'system')
         .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }));
 
-      const res = await apiFetch(`/ai/solve`, {
+      const data = await apiJson(`/ai/solve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: snapSubject, chapter: snapChapter, mode: snapMode, studentInput: currentInput, studentAttempt: currentAttempt, chatHistory })
       });
 
-      const data = await res.json();
       // Strip any <think>...</think> reasoning traces from Qwen/DeepSeek models before display
       const cleanResponse = (data.response || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
       const aiMsg = { role: 'ai', content: cleanResponse, timestamp: new Date().toISOString() };
@@ -412,7 +410,7 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
       if (onActivityTriggered) onActivityTriggered(5);
     } catch (err) {
       console.error('Send message error:', err);
-      const errMsg = { role: 'ai', content: 'Sorry, I failed to connect to the tutor service. Please check if your server is running.', timestamp: new Date().toISOString() };
+      const errMsg = { role: 'ai', content: `Sorry, I could not answer that just now.\n\n${err.message}`, timestamp: new Date().toISOString() };
       const finalMessages = [...withUser, errMsg];
       setMessages(finalMessages);
       // Still try to save even on error

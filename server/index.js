@@ -30,6 +30,10 @@ if (process.env.JWT_SECRET.length < 32) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Render (and most hosts) put a proxy in front of the app, so req.ip is only
+// correct if Express is told to trust one forwarding hop.
+app.set('trust proxy', 1);
+
 // Request logger middleware (must be first to log all requests including OPTIONS)
 app.use((req, res, next) => {
   const start = Date.now();

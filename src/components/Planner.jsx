@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Play, Pause, RotateCcw, CheckSquare, Sparkles, RefreshCw, Volume2 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
-import { apiFetch } from '../api';
+import { apiJson } from '../api';
 
 export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime, onRefreshProfile }) {
   // Pomodoro states
@@ -130,16 +130,14 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
     }
     setIsLoading(true);
     try {
-      const res = await apiFetch(`/ai/generate-schedule`, {
+      const data = await apiJson(`/ai/generate-schedule`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subjectProgress: progressData?.subjectProgress || [],
           examDate,
           targetScore
         })
       });
-      const data = await res.json();
       setSchedule(data.schedule);
       
       // Cache the schedule details
@@ -151,7 +149,7 @@ export default function Planner({ progressData, onToggleGoal, onUpdateStudyTime,
       setShowGenerateForm(false);
     } catch (err) {
       console.error(err);
-      alert('Failed to generate study schedule.');
+      alert('Failed to generate study schedule. ' + err.message);
     } finally {
       setIsLoading(false);
     }

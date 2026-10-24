@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Timer, Award, Layers, CheckCircle2, AlertTriangle, BookOpen, RefreshCw, Zap, RotateCcw, Sparkles, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import MarkdownRenderer, { LatexText } from './MarkdownRenderer';
-import { apiFetch } from '../api';
+import { apiFetch, apiJson } from '../api';
 
 const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
 
@@ -416,16 +416,14 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setErrorAnalysis(null);
     setStudentAnswers({});
     try {
-      const res = await apiFetch(`/ai/generate-test`, {
+      const paper = await apiJson(`/ai/generate-test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, chapter, duration: testDuration })
       });
-      const paper = await res.json();
       setCurrentPaper(paper);
     } catch (err) {
       console.error(err);
-      alert('Could not start mock test. Please ensure backend is running.');
+      alert('Could not start mock test. ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -438,12 +436,10 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setViolationWarning(null);
     setIsLoading(true);
     try {
-      const res = await apiFetch(`/ai/evaluate-test`, {
+      const result = await apiJson(`/ai/evaluate-test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: currentPaper.subject, generatedPaper: currentPaper, answers: studentAnswers })
       });
-      const result = await res.json();
       setEvaluation(result);
       if (onSaveTestResult) {
         await onSaveTestResult({
@@ -454,7 +450,7 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       }
     } catch (err) {
       console.error(err);
-      alert('Error during evaluation.');
+      alert('Error during evaluation. ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -465,9 +461,8 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
     setIsAnalyzingErrors(true);
     setErrorAnalysis(null);
     try {
-      const res = await apiFetch(`/ai/analyze-errors`, {
+      const data = await apiJson(`/ai/analyze-errors`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: currentPaper.subject,
           generatedPaper: currentPaper,
@@ -475,11 +470,10 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
           evaluation: evaluation
         })
       });
-      const data = await res.json();
       setErrorAnalysis(data);
     } catch (err) {
       console.error(err);
-      alert('Could not run AI error analysis. Please check your backend connection.');
+      alert('Could not run AI error analysis. ' + err.message);
     } finally {
       setIsAnalyzingErrors(false);
     }

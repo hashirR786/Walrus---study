@@ -38,5 +38,34 @@ export async function apiFetch(path, options = {}) {
     throw new Error('Your session has expired. Please sign in again.');
   }
 
+  // Rate limits carry a message the student needs to read (which limit, when it
+  // frees up), so surface the server's own wording rather than a generic error.
+  if (res.status === 429) {
+    const err = new Error(await messageFrom(res, 'You have made too many requests. Please wait a little and try again.'));
+    err.rateLimited = true;
+    throw err;
+  }
+
   return res;
+}
+
+async function messageFrom(res, fallback) {
+  try {
+    const body = await res.json();
+    return body?.error || body?.message || fallback;
+  } catch {
+    // Non-JSON body (proxy error page, empty response).
+    return fallback;
+  }
+}
+
+// For the endpoints that return JSON on success and { error } on failure. Without
+// this, callers that went straight to res.json() rendered the error body as if it
+// were real data — a rate-limited paper request became a blank mock test.
+export async function apiJson(path, options = {}) {
+  const res = await apiFetch(path, options);
+  if (!res.ok) {
+    throw new Error(await messageFrom(res, `Request failed (${res.status})`));
+  }
+  return res.json();
 }
