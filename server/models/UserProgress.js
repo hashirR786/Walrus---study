@@ -20,7 +20,8 @@ const UserProgressSchema = new mongoose.Schema({
         enum: ['Todo', 'InProgress', 'Completed'], 
         default: 'Todo' 
       },
-      masteryScore: { type: Number, default: 0 } // 0 to 100
+      masteryScore: { type: Number, default: 0 }, // 0 to 100, smoothed across attempts
+      attempts: { type: Number, default: 0 }
     }]
   }],
   studyTime: [{

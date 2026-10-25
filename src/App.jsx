@@ -361,14 +361,20 @@ export default function App() {
     const userId = user?._id || 'default-student';
     if (isOffline) {
       if (testResult.score !== null && testResult.totalMarks > 0) {
-        const pct = Math.round((testResult.score / testResult.totalMarks) * 100);
+        const pct = Math.max(0, Math.min(100, Math.round((testResult.score / testResult.totalMarks) * 100)));
         const updated = { ...progressData };
         const sub = updated.subjectProgress.find(s => s.subjectName === testResult.subject);
         if (sub) {
           const ch = sub.chapters.find(c => c.chapterName === testResult.chapter);
           if (ch) {
-            ch.masteryScore = pct;
-            ch.status = pct >= 80 ? 'Completed' : 'InProgress';
+            // Same rule the server applies, so offline attempts do not wipe a
+            // chapter's mastery either: gains count in full, drops are damped.
+            const hasHistory = (ch.attempts || 0) > 0 || ch.masteryScore > 0;
+            ch.masteryScore = !hasHistory || pct >= ch.masteryScore
+              ? pct
+              : Math.round(ch.masteryScore * 0.7 + pct * 0.3);
+            ch.attempts = (ch.attempts || 0) + 1;
+            ch.status = ch.masteryScore >= 80 ? 'Completed' : 'InProgress';
           }
         }
         setProgressData(updated);

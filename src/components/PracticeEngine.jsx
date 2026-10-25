@@ -246,7 +246,11 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
         })
       });
       const data = await res.json();
-      const next = data.warnings;
+      const next = Number(data.warnings);
+      // A non-numeric count means the server could not tally at all. Fall through
+      // to the local counter below rather than showing "null / 3" and never
+      // auto-submitting.
+      if (!Number.isFinite(next)) throw new Error('warning count unavailable');
 
       if (data.action === 'AUTO_SUBMIT' || next >= 3) {
         setIsTerminatedByStrict(true);

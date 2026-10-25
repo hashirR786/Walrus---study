@@ -432,7 +432,21 @@ router.post('/generate-test', testGenerationLimiter, async (req, res) => {
     });
 
   } catch (error) {
-    console.warn('Batched mock paper generation failed, using offline fallback:', error.message);
+    console.warn('Batched mock paper generation failed:', error.message);
+
+    // The offline fallback below is hand-written Physics content. Serving it for
+    // any other subject produced a paper of Physics questions under a title
+    // naming the requested subject -- the student sat the wrong exam, and the
+    // resulting score was written to their mastery record for that chapter.
+    // Only Physics gets the fallback; everyone else gets an honest failure.
+    if ((subject || '').trim().toLowerCase() !== 'physics') {
+      return res.status(503).json({
+        error: `The question generator is unavailable right now, so a ${subject} paper `
+          + 'could not be created. Please try again in a few minutes.'
+      });
+    }
+
+    console.warn(`Serving the offline Physics fallback paper for subject "${subject}".`);
 
     const fallbackSecA = [
       { id:'A1',  marks:1, question:'An electric dipole is placed in a uniform electric field. The net force on it is:', options:['Always zero','Never zero','Depends on its orientation','Depends on field magnitude'], answer:'Always zero' },

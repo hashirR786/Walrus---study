@@ -151,6 +151,45 @@ const calculateStreak = (streak) => {
   }
 };
 
+// ── Strict exam mode warning counter ────────────────────────────────────────
+// safeCache swallows every error and returns null when Redis is unreachable, so
+// `safeCache.incr` used to hand back null here. The route then answered 200 with
+// warnings: null, which is not >= 3, so the exam never auto-submitted and the
+// overlay rendered "Violation Count: null / 3". Redis is optional in this setup,
+// which made that the default behaviour on a fresh deploy.
+//
+// The counter now falls back to process memory. That is per-instance and lost on
+// restart, but it is strictly better than counting in the browser, where a page
+// reload would clear the tally -- exactly the cheat strict mode exists to catch.
+const localWarnings = new Map(); // warningKey -> { count, expiresAt }
+
+const pruneLocalWarnings = () => {
+  const now = Date.now();
+  for (const [key, entry] of localWarnings) {
+    if (entry.expiresAt <= now) localWarnings.delete(key);
+  }
+};
+
+const incrementWarnings = async (key, ttlSeconds) => {
+  const fromCache = await safeCache.incr(key);
+  if (typeof fromCache === 'number') {
+    // First warning of this exam: expire the key shortly after the exam ends.
+    if (fromCache === 1) await safeCache.expire(key, ttlSeconds);
+    return fromCache;
+  }
+
+  pruneLocalWarnings();
+  const existing = localWarnings.get(key);
+  const count = existing ? existing.count + 1 : 1;
+  localWarnings.set(key, { count, expiresAt: Date.now() + ttlSeconds * 1000 });
+  return count;
+};
+
+const clearWarnings = async (key) => {
+  await safeCache.del(key);
+  localWarnings.delete(key);
+};
+
 // 1. Get/Initialize Student Profile
 router.get('/progress', async (req, res) => {
   const { userId } = identityOf(req);
@@ -321,15 +360,29 @@ router.post('/tests', async (req, res) => {
 
     // If score is logged, dynamically update the masteryScore for that chapter!
     if (score !== null && totalMarks > 0) {
-      const percentage = Math.round((score / totalMarks) * 100);
+      // Clamp: the score comes back from the LLM examiner and has been seen to
+      // exceed the paper total.
+      const percentage = Math.max(0, Math.min(100, Math.round((score / totalMarks) * 100)));
       let progress = await UserProgress.findOne({ userId });
       if (progress) {
         const sub = progress.subjectProgress.find(s => s.subjectName === subject);
         if (sub) {
           const ch = sub.chapters.find(c => c.chapterName === chapter);
           if (ch) {
-            ch.masteryScore = percentage;
-            ch.status = percentage >= 80 ? 'Completed' : 'InProgress';
+            // Resist drops, trust gains. Overwriting outright meant one rushed
+            // 30-minute sprint dropped a 92% chapter to 40% and took its
+            // Completed status with it. Smoothing both directions equally would
+            // have been its own annoyance -- a student scoring 100% would see
+            // 65% -- so an improvement counts in full and only a worse score is
+            // damped.
+            // Rows predating the attempts counter are recognised by a non-zero
+            // mastery score, so their history is not thrown away either.
+            const hasHistory = (ch.attempts || 0) > 0 || ch.masteryScore > 0;
+            ch.masteryScore = !hasHistory || percentage >= ch.masteryScore
+              ? percentage
+              : Math.round(ch.masteryScore * 0.7 + percentage * 0.3);
+            ch.attempts = (ch.attempts || 0) + 1;
+            ch.status = ch.masteryScore >= 80 ? 'Completed' : 'InProgress';
           }
         }
         await progress.save();
@@ -768,15 +821,11 @@ router.post('/exam/warning', async (req, res) => {
     return res.status(400).json({ error: 'examId is required.' });
   }
   const warningKey = `exam:warning:${studentId}:${examId}`;
+  // Exam length plus a 10 minute buffer.
+  const ttlSeconds = ((Number(durationMinutes) || 60) * 60) + 600;
   try {
-    const currentWarnings = await safeCache.incr(warningKey);
-    
-    // On the first warning, set the key to expire when the exam ends (+10 mins buffer)
-    if (currentWarnings === 1) {
-      const expirySeconds = ((durationMinutes || 60) * 60) + 600;
-      await safeCache.expire(warningKey, expirySeconds);
-    }
-    
+    const currentWarnings = await incrementWarnings(warningKey, ttlSeconds);
+
     if (currentWarnings >= 3) {
       return res.json({ action: 'AUTO_SUBMIT', warnings: currentWarnings });
     }
@@ -796,7 +845,7 @@ router.post('/exam/warning/reset', async (req, res) => {
   }
   const warningKey = `exam:warning:${studentId}:${examId}`;
   try {
-    await safeCache.del(warningKey);
+    await clearWarnings(warningKey);
     return res.json({ success: true, warnings: 0 });
   } catch (error) {
     console.error('RedVER warning reset error:', error.message);
