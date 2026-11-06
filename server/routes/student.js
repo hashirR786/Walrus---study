@@ -198,6 +198,52 @@ const ownsRecord = (doc, userId, username, nameField) =>
 
 const ownsAnswer = (ans, userId, username) => ownsRecord(ans, userId, username, 'answeredBy');
 
+// ── Study room presence ──────────────────────────────────────────────────────
+// Mirrored in process memory. Presence was the one study room feature that died
+// completely when no cache was reachable: heartbeats wrote nothing and the peer
+// list came back empty, while chat carried on because it is MongoDB-backed --
+// exactly the "0 online with a working chat" that showed up in production.
+// On a single instance this map is sufficient by itself; where a cache is
+// available the two are merged so separate instances still see each other.
+const PRESENCE_TTL_SECONDS = 35;
+const localPresence = new Map(); // username -> { payload, expiresAt }
+
+const prunePresence = () => {
+  const now = Date.now();
+  for (const [name, entry] of localPresence) {
+    if (entry.expiresAt <= now) localPresence.delete(name);
+  }
+};
+
+const rememberPresence = (payload) => {
+  localPresence.set(payload.username, {
+    payload,
+    expiresAt: Date.now() + PRESENCE_TTL_SECONDS * 1000
+  });
+};
+
+const forgetPresence = (username) => localPresence.delete(username);
+
+// Local first, then anything the cache knows from other instances; keyed by
+// username so the same student is never counted twice.
+const readPresence = async () => {
+  prunePresence();
+  const byName = new Map();
+  for (const entry of localPresence.values()) {
+    byName.set(entry.payload.username, entry.payload);
+  }
+  const keys = await safeCache.keys('presence:studyroom:*');
+  for (const key of keys || []) {
+    try {
+      const raw = await safeCache.get(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.username) byName.set(parsed.username, parsed);
+    } catch { /* skip malformed */ }
+  }
+  return [...byName.values()];
+};
+
 // ── Shared study room Pomodoro ───────────────────────────────────────────────
 // One clock for the whole room. The server stores a descriptor rather than a
 // ticking counter, and every read computes the remaining seconds itself; clients
@@ -800,10 +846,15 @@ router.post('/studyroom/heartbeat', async (req, res) => {
   const { username } = identityOf(req);
   const { status, focusSubject } = req.body;
   try {
-    // Key expires after 35 seconds — if client misses 1 ping it will still appear, but 2 misses = offline
-    const presenceKey = `presence:studyroom:${username}`;
-    const payload = JSON.stringify({ username, status: status || 'Studying', focusSubject: focusSubject || 'General', lastSeen: Date.now() });
-    await safeCache.setEx(presenceKey, 35, payload);
+    // Expires after 35s: miss one ping and you still show, miss two and you drop.
+    const payload = {
+      username,
+      status: status || 'Studying',
+      focusSubject: focusSubject || 'General',
+      lastSeen: Date.now()
+    };
+    rememberPresence(payload);
+    await safeCache.setEx(`presence:studyroom:${username}`, PRESENCE_TTL_SECONDS, JSON.stringify(payload));
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -814,6 +865,7 @@ router.post('/studyroom/heartbeat', async (req, res) => {
 router.post('/studyroom/leave', async (req, res) => {
   const { username } = identityOf(req);
   try {
+    forgetPresence(username);
     await safeCache.del(`presence:studyroom:${username}`);
     return res.json({ ok: true });
   } catch (error) {
@@ -821,22 +873,10 @@ router.post('/studyroom/leave', async (req, res) => {
   }
 });
 
-// 19. Get ONLY concurrently online study room users (via Redis presence keys)
+// 19. Who is concurrently in the study room
 router.get('/studyroom/users', async (req, res) => {
   try {
-    const presenceKeys = await safeCache.keys('presence:studyroom:*');
-    if (!presenceKeys || presenceKeys.length === 0) {
-      return res.json([]);
-    }
-    // Parse each presence record stored in Redis
-    const peers = [];
-    for (const key of presenceKeys) {
-      try {
-        const raw = await safeCache.get(key);
-        if (raw) peers.push(JSON.parse(raw));
-      } catch { /* skip malformed */ }
-    }
-    return res.json(peers);
+    return res.json(await readPresence());
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

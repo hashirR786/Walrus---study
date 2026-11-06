@@ -7,11 +7,12 @@ const cache = createClient({
   url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
   socket: {
     reconnectStrategy: (retries) => {
-      // Limit reconnect attempts to 5 to avoid infinite loops and log spam in cloud production (Render)
-      if (retries > 5) {
-        return false; // stops reconnecting
-      }
-      return 5000; // retry every 5 seconds
+      // Never stop trying. Returning false here killed the client for the whole
+      // life of the process, so a cache that was briefly unreachable at boot --
+      // or a REDIS_URL that is simply not set, leaving the default localhost
+      // address to fail five times -- disabled caching permanently.
+      // Back off to at most 30s instead; the error log below is throttled.
+      return Math.min(1000 * 2 ** retries, 30000);
     }
   }
 });
@@ -30,9 +31,15 @@ cache.on('end', () => {
   console.log('🔌 RedVER Cache connection closed.');
 });
 
+let lastCacheErrorLog = 0;
 cache.on('error', (err) => {
   isCacheConnected = false;
-  console.warn('RedVER Cache Error:', err.message);
+  // Throttled: with an unreachable cache this fires on every retry forever.
+  const now = Date.now();
+  if (now - lastCacheErrorLog > 60000) {
+    lastCacheErrorLog = now;
+    console.warn('Cache unavailable, retrying in the background:', err.message);
+  }
 });
 
 const connectCache = async () => {

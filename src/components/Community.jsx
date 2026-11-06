@@ -966,63 +966,27 @@ export default function Community({ progressData, user }) {
                   {onlineUsers.length} online
                 </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '260px', overflowY: 'auto' }}>
-                {onlineUsers.length > 0 ? onlineUsers.map((peer, idx) => {
-                  const isMe = peer.username === user?.username;
-                  const initials = peer.username ? peer.username.slice(0, 2).toUpperCase() : '??';
-                  const avatarColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#14b8a6','#3b82f6','#ef4444'];
-                  const color = avatarColors[peer.username.charCodeAt(0) % avatarColors.length];
-                  const subjectColors = { Physics: '#6366f1', Chemistry: '#10b981', Mathematics: '#f59e0b', Biology: '#22c55e', Economics: '#3b82f6', 'Computer Science': '#f97316', General: '#94a3b8' };
-                  const subjectColor = subjectColors[peer.focusSubject] || '#94a3b8';
-                  return (
-                    <div key={peer.username || idx} style={{
-                      display: 'flex', alignItems: 'center', gap: '0.75rem',
-                      padding: '0.65rem 0.85rem',
-                      border: `1px solid ${isMe ? 'rgba(99,102,241,0.35)' : 'var(--border-color)'}`,
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: isMe ? 'rgba(99,102,241,0.07)' : 'var(--bg-app)',
-                      transition: 'all 0.2s'
-                    }}>
-                      {/* Avatar with online ring */}
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <div style={{
-                          width: '38px', height: '38px', borderRadius: '50%',
-                          backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.85rem', fontWeight: 700, color: '#fff',
-                          boxShadow: `0 0 0 2.5px var(--bg-card), 0 0 0 4.5px #22c55e`
-                        }}>{initials}</div>
-                        {/* Animated pulse for online */}
-                        <span style={{
-                          position: 'absolute', bottom: '1px', right: '1px',
-                          width: '10px', height: '10px', borderRadius: '50%',
-                          backgroundColor: '#22c55e', border: '2px solid var(--bg-card)'
-                        }} />
-                      </div>
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{peer.username}</span>
-                          {isMe && <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: '999px', background: 'rgba(99,102,241,0.15)', color: 'var(--primary)', fontWeight: 700 }}>You</span>}
-                        </div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{peer.status || 'Studying'}</span>
-                      </div>
-                      {/* Subject badge */}
-                      <span style={{
-                        fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.55rem',
-                        borderRadius: '999px', whiteSpace: 'nowrap',
-                        backgroundColor: `${subjectColor}18`,
-                        color: subjectColor,
-                        border: `1px solid ${subjectColor}40`
-                      }}>{peer.focusSubject || 'General'}</span>
-                    </div>
-                  );
-                }) : (
-                  <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🦭</div>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 500 }}>You're the first one here!</p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: '0.25rem 0 0' }}>Peers will appear when they join the Study Room.</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', padding: '0.5rem 0.25rem 0.25rem' }}>
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1.2rem', fontWeight: 800,
+                  color: onlineUsers.length > 0 ? '#22c55e' : 'var(--text-muted)',
+                  backgroundColor: onlineUsers.length > 0 ? 'rgba(34,197,94,0.12)' : 'var(--bg-app)',
+                  border: `1px solid ${onlineUsers.length > 0 ? 'rgba(34,197,94,0.3)' : 'var(--border-color)'}`
+                }}>
+                  {onlineUsers.length}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 600 }}>
+                    {onlineUsers.length === 1 ? 'student in the room' : 'students in the room'}
                   </div>
-                )}
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {onlineUsers.length > 0
+                      ? 'Includes you. Refreshes every 15 seconds.'
+                      : 'Nobody is here right now.'}
+                  </span>
+                </div>
               </div>
             </div>
 
