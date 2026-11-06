@@ -1282,6 +1282,13 @@ button.btn-secondary:hover {
   transform: none;
 }
 
+/* While submitting, the button is disabled but must not look greyed out: the
+   spinner is the feedback, and 0.6 opacity washed it off the tan background. */
+.auth-submit-btn[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}
+
 /* Animations */
 .auth-input-group.slide-down {
   animation: authSlideDownFade 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -1900,6 +1907,161 @@ button.btn-secondary:hover {
 }
 
 
+/* ── Loading spinner ──────────────────────────────────────────────────────────
+   `animate-spin` is used by 13 loading indicators across 6 components, but it
+   was never defined anywhere and this project has no Tailwind, so every one of
+   them rendered as a frozen glyph. Defining it here makes all of them live. */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 0.9s linear infinite;
+  transform-origin: center;
+}
+
+/* A spinner still has to read as "working" when motion is reduced, so slow it
+   down rather than stopping it. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation-duration: 2.4s;
+  }
+}
 
 
+/* Shown in the sidebar while a strict exam is running, so the greyed-out
+   navigation reads as deliberate rather than broken. */
+.exam-lock-note {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0.5rem 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background-color: rgba(217, 159, 89, 0.12);
+  color: var(--warning);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
 
+/* -- Collapsible sidebar -----------------------------------------------------
+   Collapsed is a narrow icon rail in the style of ChatGPT's: no labels, no
+   group dividers, evenly spaced icons, avatar at the foot. Every rule is scoped
+   to desktop -- under 768px the sidebar is already a slide-in drawer, so
+   collapsing it there would only add a second, conflicting idea of "hidden". */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  /* the drawer has its own close button */
+  .sidebar-collapse-btn { display: none; }
+}
+
+@media (min-width: 769px) {
+  .app-container.sidebar-collapsed .sidebar {
+    width: 60px;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+    align-items: center;
+  }
+
+  .app-container.sidebar-collapsed .main-content {
+    margin-left: 60px;
+  }
+
+  /* logo stacked over the toggle, both centred in the rail */
+  .sidebar.collapsed .brand {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* the logo is sized by an inline style, so overriding it needs the weight */
+  .sidebar.collapsed .brand img {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .sidebar.collapsed .sidebar-collapse-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* .brand-text and the profile's text column carry inline display:flex, which
+     outranks any rule here, so those two are hidden from the component instead. */
+  .sidebar.collapsed .nav-item span,
+  .sidebar.collapsed .exam-lock-note span {
+    display: none;
+  }
+
+  /* the streak badge is a label with an emoji; a lone fire glyph in a 60px rail
+     reads as clutter, so the whole badge goes until the sidebar is expanded */
+  .sidebar.collapsed .streak-badge-premium {
+    display: none;
+  }
+
+  /* no group labels and no dividers in the rail: one clean column of icons */
+  .sidebar.collapsed .nav-group-header {
+    display: none;
+  }
+
+  .sidebar.collapsed .nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .sidebar.collapsed .nav-item {
+    justify-content: center;
+    gap: 0;
+    width: 40px;
+    height: 40px;
+    margin: 0 auto;
+    padding: 0;
+    border-radius: 10px;
+  }
+
+  .sidebar.collapsed .exam-lock-note {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+  }
+
+  /* avatar alone at the foot, like the rail's account button */
+  .sidebar.collapsed .sidebar-profile-card {
+    justify-content: center;
+    gap: 0;
+    width: 40px;
+    margin: 0 auto;
+    padding: 0.25rem;
+  }
+
+  /* theme and logout stack instead of sitting side by side */
+  .sidebar.collapsed .sidebar-controls > div {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+}

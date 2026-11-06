@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, MessageSquare, Link as LinkIcon, ThumbsUp, Send, Library, Trash2, X, AlertTriangle, Download, ZoomIn } from 'lucide-react';
+import { Users, MessageSquare, Link as LinkIcon, ThumbsUp, Send, Library, Trash2, Pencil, X, AlertTriangle, Download, ZoomIn } from 'lucide-react';
 import { apiFetch } from '../api';
 
 // Inline confirmation dialog component (replaces window.confirm)
@@ -47,6 +47,13 @@ export default function Community({ progressData, user }) {
   const [newThreadSubject, setNewThreadSubject] = useState('Physics');
   const [selectedThread, setSelectedThread] = useState(null);
   const [replyContent, setReplyContent] = useState('');
+  const [editingAnswerId, setEditingAnswerId] = useState(null);
+  const [editingAnswerText, setEditingAnswerText] = useState('');
+  const [editingThread, setEditingThread] = useState(null);      // { title, content }
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingNote, setEditingNote] = useState(null);          // { title, subject, description, link }
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editingMessageText, setEditingMessageText] = useState('');
 
   // Shared Notes states
   const [sharedNotes, setSharedNotes] = useState([]);
@@ -58,7 +65,8 @@ export default function Community({ progressData, user }) {
 
   // Study Room
   const [roomTimer, setRoomTimer] = useState(1500);
-  const [timerRunning, setTimerRunning] = useState(true);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerBy, setTimerBy] = useState('');
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [newMessageText, setNewMessageText] = useState('');
@@ -75,6 +83,11 @@ export default function Community({ progressData, user }) {
   const subjects = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Economics', 'Computer Science'];
   const statuses = ['Studying', 'Solving PYQs', 'Reading Cheatsheet', 'Reviewing Syllabus', 'Revising notes'];
 
+  const answerIconBtn = {
+    display: 'flex', alignItems: 'center', gap: '0.25rem', padding: 0,
+    border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)'
+  };
+
   // Helper: show inline confirmation instead of window.confirm
   const showConfirm = (message, onConfirm) => {
     setConfirmDialog({ message, onConfirm });
@@ -86,16 +99,13 @@ export default function Community({ progressData, user }) {
     presenceRef.current = { ...presenceRef.current, username: user?.username };
   }, [user]);
 
-  // Sync Timer
+  // Local tick for smoothness only -- the server owns the clock, and the poll
+  // below re-syncs every few seconds so drift never accumulates.
   useEffect(() => {
-    let interval;
-    if (timerRunning && roomTimer > 0) {
-      interval = setInterval(() => setRoomTimer(p => p - 1), 1000);
-    } else if (roomTimer === 0) {
-      setRoomTimer(1500);
-    }
+    if (!timerRunning) return;
+    const interval = setInterval(() => setRoomTimer(p => (p > 0 ? p - 1 : 0)), 1000);
     return () => clearInterval(interval);
-  }, [timerRunning, roomTimer]);
+  }, [timerRunning]);
 
   // Load data on tab switch
   useEffect(() => {
@@ -106,15 +116,19 @@ export default function Community({ progressData, user }) {
       sendHeartbeat();
       fetchOnlineUsers();
       fetchMessages();
+      fetchTimer();
 
-      // Refresh peers every 15s, messages every 5s, heartbeat every 20s
+      // Refresh peers every 15s, messages and the shared timer every 5s,
+      // heartbeat every 20s
       const peersInterval = setInterval(fetchOnlineUsers, 15000);
       const msgInterval = setInterval(fetchMessages, 5000);
+      const timerInterval = setInterval(fetchTimer, 5000);
       const heartbeatInterval = setInterval(sendHeartbeat, 20000);
 
       return () => {
         clearInterval(peersInterval);
         clearInterval(msgInterval);
+        clearInterval(timerInterval);
         clearInterval(heartbeatInterval);
         // Explicitly mark as offline when leaving the tab
         leaveRoom();
@@ -166,6 +180,68 @@ export default function Community({ progressData, user }) {
     } catch { alert('Could not post answer.'); }
   };
 
+  // Mirrors the server's rule: records predating ownerId are matched on the
+  // display name, the only record of who wrote them.
+  const canManage = (doc, nameField) =>
+    doc?.ownerId ? doc.ownerId === user?._id : doc?.[nameField] === user?.username;
+
+  const canManageAnswer = (ans) => canManage(ans, 'answeredBy');
+
+  const startEditAnswer = (ans) => {
+    setEditingAnswerId(ans._id);
+    setEditingAnswerText(ans.content);
+  };
+
+  const cancelEditAnswer = () => {
+    setEditingAnswerId(null);
+    setEditingAnswerText('');
+  };
+
+  const saveEditAnswer = async (answerId) => {
+    if (!editingAnswerText.trim() || !selectedThread) return;
+    try {
+      const res = await apiFetch(`/student/forum/${selectedThread._id}/answer/${answerId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: editingAnswerText })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Could not save your edit: ${err.error || 'Server error'}`);
+        return;
+      }
+      const updated = await res.json();
+      setThreads(prev => prev.map(t => t._id === updated._id ? updated : t));
+      setSelectedThread(updated);
+      cancelEditAnswer();
+    } catch (e) {
+      console.error(e);
+      alert('Network error while saving your edit.');
+    }
+  };
+
+  const doDeleteAnswer = async (answerId) => {
+    dismissConfirm();
+    if (!selectedThread) return;
+    try {
+      const res = await apiFetch(`/student/forum/${selectedThread._id}/answer/${answerId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Delete failed: ${err.error || 'Server error'}`);
+        return;
+      }
+      const updated = await res.json();
+      setThreads(prev => prev.map(t => t._id === updated._id ? updated : t));
+      setSelectedThread(updated);
+    } catch (e) {
+      console.error(e);
+      alert('Network error during deletion.');
+    }
+  };
+
+  const handleDeleteAnswer = (answerId) => {
+    showConfirm('Delete this comment? This cannot be undone.', () => doDeleteAnswer(answerId));
+  };
+
   const handleUpvoteAnswer = async (answerId) => {
     if (!selectedThread) return;
     try {
@@ -190,6 +266,35 @@ export default function Community({ progressData, user }) {
     } catch (e) {
       console.error(e);
       alert('Network error during deletion.');
+    }
+  };
+
+  const startEditThread = () => {
+    if (!selectedThread) return;
+    setEditingThread({ title: selectedThread.title, content: selectedThread.content });
+  };
+
+  const cancelEditThread = () => setEditingThread(null);
+
+  const saveEditThread = async () => {
+    if (!selectedThread || !editingThread?.title.trim() || !editingThread?.content.trim()) return;
+    try {
+      const res = await apiFetch(`/student/forum/${selectedThread._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title: editingThread.title, content: editingThread.content })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Could not save your question: ${err.error || 'Server error'}`);
+        return;
+      }
+      const updated = await res.json();
+      setThreads(prev => prev.map(t => t._id === updated._id ? updated : t));
+      setSelectedThread(updated);
+      setEditingThread(null);
+    } catch (e) {
+      console.error(e);
+      alert('Network error while saving your question.');
     }
   };
 
@@ -254,6 +359,42 @@ export default function Community({ progressData, user }) {
     }
   };
 
+  const startEditNote = (note) => {
+    setEditingNoteId(note._id);
+    setEditingNote({
+      title: note.title,
+      subject: note.subject,
+      description: note.description || '',
+      link: note.link || ''
+    });
+  };
+
+  const cancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditingNote(null);
+  };
+
+  const saveEditNote = async (id) => {
+    if (!editingNote?.title.trim()) return;
+    try {
+      const res = await apiFetch(`/student/notes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editingNote)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Could not save your note: ${err.error || 'Server error'}`);
+        return;
+      }
+      const updated = await res.json();
+      setSharedNotes(prev => prev.map(n => n._id === updated._id ? updated : n));
+      cancelEditNote();
+    } catch (e) {
+      console.error(e);
+      alert('Network error while saving your note.');
+    }
+  };
+
   const handleDeleteNote = (id) => {
     showConfirm('Delete this shared note? This cannot be undone.', () => doDeleteNote(id));
   };
@@ -296,6 +437,57 @@ export default function Community({ progressData, user }) {
     } catch { /* offline */ }
   };
 
+  const startEditMessage = (msg) => {
+    setEditingMessageId(msg._id);
+    setEditingMessageText(msg.text);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditingMessageText('');
+  };
+
+  const saveEditMessage = async (id) => {
+    if (!editingMessageText.trim()) return;
+    try {
+      const res = await apiFetch(`/student/studyroom/messages/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ text: editingMessageText })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Could not save your message: ${err.error || 'Server error'}`);
+        return;
+      }
+      const updated = await res.json();
+      setMessages(prev => prev.map(m => m._id === updated._id ? updated : m));
+      cancelEditMessage();
+    } catch (e) {
+      console.error(e);
+      alert('Network error while saving your message.');
+    }
+  };
+
+  const doDeleteMessage = async (id) => {
+    dismissConfirm();
+    try {
+      const res = await apiFetch(`/student/studyroom/messages/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Delete failed: ${err.error || 'Server error'}`);
+        return;
+      }
+      setMessages(prev => prev.filter(m => m._id !== id));
+    } catch (e) {
+      console.error(e);
+      alert('Network error during deletion.');
+    }
+  };
+
+  const handleDeleteMessage = (id) => {
+    showConfirm('Delete this message? This cannot be undone.', () => doDeleteMessage(id));
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessageText.trim()) return;
@@ -311,6 +503,40 @@ export default function Community({ progressData, user }) {
         setNewMessageText('');
       }
     } catch { /* offline */ }
+  };
+
+  // ── Shared room timer ───────────────────────────────────────────────────────
+  const applyTimer = (t) => {
+    if (!t) return;
+    setRoomTimer(Math.max(0, t.remaining ?? 0));
+    setTimerRunning(!!t.running);
+    setTimerBy(t.updatedBy || '');
+  };
+
+  const fetchTimer = async () => {
+    try {
+      const res = await apiFetch(`/student/studyroom/timer`);
+      if (res.ok) applyTimer(await res.json());
+    } catch { /* offline */ }
+  };
+
+  // start / pause / reset apply to everyone in the room, not just this tab.
+  const controlTimer = async (action) => {
+    try {
+      const res = await apiFetch(`/student/studyroom/timer`, {
+        method: 'POST',
+        body: JSON.stringify({ action })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Could not update the room timer: ${err.error || 'Server error'}`);
+        return;
+      }
+      applyTimer(await res.json());
+    } catch (e) {
+      console.error(e);
+      alert('Network error while updating the room timer.');
+    }
   };
 
   const formatTimer = (secs) => {
@@ -430,7 +656,13 @@ export default function Community({ progressData, user }) {
                       style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}>
                       <X size={16} />
                     </button>
-                    {selectedThread.askedBy === user?.username && (
+                    {canManage(selectedThread, 'askedBy') && !editingThread && (
+                      <button onClick={startEditThread} title="Edit your question"
+                        style={{ border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '0.25rem 0.6rem', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <Pencil size={13} /> Edit
+                      </button>
+                    )}
+                    {canManage(selectedThread, 'askedBy') && (
                       <button onClick={e => handleDeleteThread(selectedThread._id, e)}
                         style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', borderRadius: '6px', padding: '0.25rem 0.6rem', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <Trash2 size={13} /> Delete
@@ -438,21 +670,76 @@ export default function Community({ progressData, user }) {
                     )}
                   </div>
                 </div>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{selectedThread.title}</h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{selectedThread.content}</p>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>Posted by {selectedThread.askedBy}</span>
+                {editingThread ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <input type="text" className="input-control" value={editingThread.title}
+                      onChange={e => setEditingThread({ ...editingThread, title: e.target.value })} />
+                    <textarea className="input-control" rows={4} value={editingThread.content}
+                      onChange={e => setEditingThread({ ...editingThread, content: e.target.value })}
+                      style={{ resize: 'vertical' }} />
+                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                      <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+                        onClick={cancelEditThread}>Cancel</button>
+                      <button className="btn-primary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+                        onClick={saveEditThread}
+                        disabled={!editingThread.title.trim() || !editingThread.content.trim()}>Save</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{selectedThread.title}</h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{selectedThread.content}</p>
+                  </>
+                )}
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                  Posted by {selectedThread.askedBy}
+                  {selectedThread.editedAt && <span style={{ fontStyle: 'italic' }}> (edited)</span>}
+                </span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem' }}>
                 {selectedThread.answers?.length > 0 ? selectedThread.answers.map(ans => (
                   <div key={ans._id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', backgroundColor: ans.isAI ? 'var(--primary-light)' : 'var(--bg-app)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.4rem', fontWeight: 600 }}>
-                      <span style={{ color: ans.isAI ? 'var(--primary)' : 'var(--text-primary)' }}>{ans.isAI ? '🤖 AI Tutor' : ans.answeredBy}</span>
-                      <button style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => handleUpvoteAnswer(ans._id)}>
-                        <ThumbsUp size={12} /> {ans.upvotes || 0}
-                      </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', marginBottom: '0.4rem', fontWeight: 600 }}>
+                      <span style={{ color: ans.isAI ? 'var(--primary)' : 'var(--text-primary)' }}>
+                        {ans.isAI ? '🤖 AI Tutor' : ans.answeredBy}
+                        {ans.editedAt && (
+                          <span style={{ fontWeight: 400, fontStyle: 'italic', color: 'var(--text-muted)', marginLeft: '0.35rem' }}>(edited)</span>
+                        )}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        {canManageAnswer(ans) && editingAnswerId !== ans._id && (
+                          <>
+                            {!ans.isAI && (
+                              <button title="Edit your comment" onClick={() => startEditAnswer(ans)} style={answerIconBtn}>
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                            <button title="Delete your comment" onClick={() => handleDeleteAnswer(ans._id)} style={answerIconBtn}>
+                              <Trash2 size={12} />
+                            </button>
+                          </>
+                        )}
+                        <button style={answerIconBtn} onClick={() => handleUpvoteAnswer(ans._id)}>
+                          <ThumbsUp size={12} /> {ans.upvotes || 0}
+                        </button>
+                      </div>
                     </div>
-                    <p style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', margin: 0 }}>{ans.content}</p>
+                    {editingAnswerId === ans._id ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <textarea className="input-control" rows={3} value={editingAnswerText}
+                          onChange={e => setEditingAnswerText(e.target.value)}
+                          style={{ fontSize: '0.85rem', resize: 'vertical' }} />
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                          <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+                            onClick={cancelEditAnswer}>Cancel</button>
+                          <button className="btn-primary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+                            onClick={() => saveEditAnswer(ans._id)} disabled={!editingAnswerText.trim()}>Save</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', margin: 0 }}>{ans.content}</p>
+                    )}
                   </div>
                 )) : (
                   <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem' }}>No solutions yet. Be the first to help!</p>
@@ -513,8 +800,13 @@ export default function Community({ progressData, user }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <span className="badge badge-primary" style={{ marginBottom: '0.25rem' }}>{note.subject}</span>
-                      <h4 style={{ fontSize: '0.95rem', fontWeight: 600 }}>{note.title}</h4>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Shared by {note.author}</span>
+                      {editingNoteId !== note._id && (
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600 }}>{note.title}</h4>
+                      )}
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Shared by {note.author}
+                        {note.editedAt && <span style={{ fontStyle: 'italic' }}> (edited)</span>}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {note.link && (
@@ -523,7 +815,14 @@ export default function Community({ progressData, user }) {
                           <LinkIcon size={14} /> View
                         </a>
                       )}
-                      {note.author === user?.username && (
+                      {canManage(note, 'author') && editingNoteId !== note._id && (
+                        <button onClick={() => startEditNote(note)}
+                          style={{ border: 'none', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
+                          title="Edit Note">
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {canManage(note, 'author') && (
                         <button onClick={() => handleDeleteNote(note._id)}
                           style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
                           title="Delete Note">
@@ -532,7 +831,32 @@ export default function Community({ progressData, user }) {
                       )}
                     </div>
                   </div>
-                  {note.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{note.description}</p>}
+                  {editingNoteId === note._id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <input type="text" className="input-control" placeholder="Title" value={editingNote.title}
+                        onChange={e => setEditingNote({ ...editingNote, title: e.target.value })} />
+                      <select className="input-control" value={editingNote.subject}
+                        onChange={e => setEditingNote({ ...editingNote, subject: e.target.value })}>
+                        {activeSubjects.map(s => <option key={s}>{s}</option>)}
+                      </select>
+                      <textarea className="input-control" rows={3} placeholder="Description" value={editingNote.description}
+                        onChange={e => setEditingNote({ ...editingNote, description: e.target.value })}
+                        style={{ resize: 'vertical' }} />
+                      <input type="url" className="input-control" placeholder="Attach link" value={editingNote.link}
+                        onChange={e => setEditingNote({ ...editingNote, link: e.target.value })} />
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        To change the image, delete this note and share it again.
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+                          onClick={cancelEditNote}>Cancel</button>
+                        <button className="btn-primary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
+                          onClick={() => saveEditNote(note._id)} disabled={!editingNote.title.trim()}>Save</button>
+                      </div>
+                    </div>
+                  ) : (
+                    note.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{note.description}</p>
+                  )}
                   {note.image && (
                     <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
                       <img
@@ -578,9 +902,19 @@ export default function Community({ progressData, user }) {
               <h3>Virtual Study Room</h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Synchronized Pomodoro timer with peers!</p>
               <div className="pomodoro-dial active" style={{ width: '150px', height: '150px', fontSize: '2rem' }}>{formatTimer(roomTimer)}</div>
-              <button className="btn-secondary" style={{ marginTop: '1.5rem' }} onClick={() => setTimerRunning(p => !p)}>
-                {timerRunning ? 'Pause Session' : 'Resume Session'}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button className="btn-secondary" onClick={() => controlTimer(timerRunning ? 'pause' : 'start')}>
+                  {timerRunning ? 'Pause Session' : 'Start Session'}
+                </button>
+                <button className="btn-secondary" onClick={() => controlTimer('reset')}>
+                  Reset
+                </button>
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.6rem', minHeight: '1em' }}>
+                {timerBy
+                  ? `${timerRunning ? 'Started' : 'Paused'} by ${timerBy} \u00b7 everyone in the room shares this clock`
+                  : 'Everyone in the room shares this clock'}
+              </span>
             </div>
 
             {/* My Status Card */}
@@ -701,11 +1035,40 @@ export default function Community({ progressData, user }) {
                   const isMe = msg.sender === user?.username;
                   return (
                     <div key={msg._id || i} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', padding: '0.55rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', backgroundColor: isMe ? 'var(--primary-light)' : 'var(--bg-card)', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
-                        <span>{isMe ? 'You' : msg.sender}</span>
-                        <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1.5rem', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                        <span>
+                          {isMe ? 'You' : msg.sender}
+                          {msg.editedAt && <span style={{ fontWeight: 'normal', fontStyle: 'italic', color: 'var(--text-muted)' }}> (edited)</span>}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          {canManage(msg, 'sender') && msg._id && editingMessageId !== msg._id && (
+                            <>
+                              <button title="Edit your message" onClick={() => startEditMessage(msg)} style={answerIconBtn}>
+                                <Pencil size={11} />
+                              </button>
+                              <button title="Delete your message" onClick={() => handleDeleteMessage(msg._id)} style={answerIconBtn}>
+                                <Trash2 size={11} />
+                              </button>
+                            </>
+                          )}
+                          <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.85rem', wordBreak: 'break-word' }}>{msg.text}</p>
+                      {editingMessageId === msg._id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <textarea className="input-control" rows={2} value={editingMessageText}
+                            onChange={e => setEditingMessageText(e.target.value)}
+                            style={{ fontSize: '0.85rem', resize: 'vertical' }} />
+                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                            <button className="btn-secondary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem' }}
+                              onClick={cancelEditMessage}>Cancel</button>
+                            <button className="btn-primary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem' }}
+                              onClick={() => saveEditMessage(msg._id)} disabled={!editingMessageText.trim()}>Save</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '0.85rem', wordBreak: 'break-word' }}>{msg.text}</p>
+                      )}
                     </div>
                   );
                 }) : <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem', padding: '1.5rem 0' }}>No messages yet. Start the conversation!</p>}

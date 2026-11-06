@@ -96,7 +96,13 @@ const safeCache = {
   setEx: async (key, seconds, value) => {
     if (!isCacheConnected) return null;
     try {
-      return await cache.setEx(key, seconds, value);
+      // Expressed as SET ... EX rather than SETEX on purpose: RedVER, the local
+      // cache engine, does not implement SETEX and answered
+      // "ERR unknown command 'SETEX'". safeCache swallowed that error and
+      // returned null, so study room presence keys were never written and the
+      // online list was permanently empty. SET with EX works on RedVER and on
+      // real Redis alike.
+      return await cache.set(key, value, { EX: seconds });
     } catch (err) {
       console.warn('Cache setEx error:', err.message);
       return null;

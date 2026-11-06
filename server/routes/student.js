@@ -190,6 +190,69 @@ const clearWarnings = async (key) => {
   localWarnings.delete(key);
 };
 
+// One ownership rule for every community record. Documents created before
+// ownerId existed fall back to the display name, which is the only record of who
+// wrote them. `nameField` is whatever that document calls its author.
+const ownsRecord = (doc, userId, username, nameField) =>
+  doc.ownerId ? doc.ownerId === userId : doc[nameField] === username;
+
+const ownsAnswer = (ans, userId, username) => ownsRecord(ans, userId, username, 'answeredBy');
+
+// ── Shared study room Pomodoro ───────────────────────────────────────────────
+// One clock for the whole room. The server stores a descriptor rather than a
+// ticking counter, and every read computes the remaining seconds itself; clients
+// tick locally between polls purely for smoothness. Handing back seconds instead
+// of an absolute end time keeps a student whose device clock is wrong in step
+// with everyone else.
+const TIMER_KEY = 'studyroom:timer';
+const DEFAULT_SESSION_SECONDS = 1500; // 25 minutes
+const MAX_SESSION_SECONDS = 7200;
+
+// Mirrored in process memory so the room still works on a single instance when
+// the cache is unreachable -- safeCache silently returning null is exactly what
+// left presence broken.
+let localTimer = null;
+
+const defaultTimer = () => ({
+  running: false,
+  duration: DEFAULT_SESSION_SECONDS,
+  endsAt: null,
+  remaining: DEFAULT_SESSION_SECONDS,
+  updatedBy: '',
+  updatedAt: Date.now()
+});
+
+const readTimer = async () => {
+  const raw = await safeCache.get(TIMER_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); } catch { /* corrupt entry, fall through */ }
+  }
+  return localTimer || defaultTimer();
+};
+
+const writeTimer = async (state) => {
+  localTimer = state;
+  await safeCache.set(TIMER_KEY, JSON.stringify(state), { EX: 24 * 60 * 60 });
+  return state;
+};
+
+// Collapses a stored descriptor into what is true right now.
+const projectTimer = (state) => {
+  if (!state.running || !state.endsAt) {
+    return { ...state, remaining: Math.max(0, Math.round(state.remaining)) };
+  }
+  return { ...state, remaining: Math.max(0, Math.round((state.endsAt - Date.now()) / 1000)) };
+};
+
+// endsAt is server bookkeeping; clients only ever see seconds.
+const publicTimer = (s) => ({
+  running: s.running,
+  remaining: s.remaining,
+  duration: s.duration,
+  updatedBy: s.updatedBy,
+  updatedAt: s.updatedAt
+});
+
 // 1. Get/Initialize Student Profile
 router.get('/progress', async (req, res) => {
   const { userId } = identityOf(req);
@@ -429,7 +492,7 @@ router.post('/forum', async (req, res) => {
 // 10. Post Answer to Forum thread
 router.post('/forum/:id/answer', async (req, res) => {
   const { id } = req.params;
-  const { username } = identityOf(req);
+  const { userId, username } = identityOf(req);
   const { content, isAI } = req.body;
 
   try {
@@ -440,7 +503,8 @@ router.post('/forum/:id/answer', async (req, res) => {
       answeredBy: username,
       content,
       isAI: !!isAI,
-      upvotes: 0
+      upvotes: 0,
+      ownerId: userId
     });
 
     await thread.save();
@@ -470,6 +534,92 @@ router.post('/forum/:id/answer/:answerId/upvote', async (req, res) => {
   }
 });
 
+// 11b. Edit your own answer
+router.put('/forum/:id/answer/:answerId', async (req, res) => {
+  const { id, answerId } = req.params;
+  const { userId, username } = identityOf(req);
+  const { content } = req.body;
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ error: 'Answer content is required' });
+  }
+
+  try {
+    const thread = await DoubtForum.findById(id);
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+
+    const ans = thread.answers.id(answerId);
+    if (!ans) return res.status(404).json({ error: 'Answer not found' });
+    if (!ownsAnswer(ans, userId, username)) {
+      return res.status(403).json({ error: 'You can only edit your own comments' });
+    }
+    // The AI wrote this text. Letting a student rewrite it and leave the AI Tutor
+    // label attached would put words in its mouth for everyone else reading.
+    if (ans.isAI) {
+      return res.status(403).json({ error: 'AI answers cannot be edited' });
+    }
+
+    ans.content = content.trim();
+    ans.editedAt = new Date();
+    await thread.save();
+    return res.json(thread);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 11c. Delete your own answer
+router.delete('/forum/:id/answer/:answerId', async (req, res) => {
+  const { id, answerId } = req.params;
+  const { userId, username } = identityOf(req);
+
+  try {
+    const thread = await DoubtForum.findById(id);
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+
+    const ans = thread.answers.id(answerId);
+    if (!ans) return res.status(404).json({ error: 'Answer not found' });
+    if (!ownsAnswer(ans, userId, username)) {
+      return res.status(403).json({ error: 'You can only delete your own comments' });
+    }
+
+    thread.answers.pull(answerId);
+    await thread.save();
+    return res.json(thread);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 11d. Edit your own thread
+router.put('/forum/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId, username } = identityOf(req);
+  const { title, content, subject } = req.body;
+
+  if (!title || !title.trim() || !content || !content.trim()) {
+    return res.status(400).json({ error: 'Title and content are required' });
+  }
+
+  try {
+    const thread = await DoubtForum.findById(id);
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+    if (!ownsRecord(thread, userId, username, 'askedBy')) {
+      return res.status(403).json({ error: 'You can only edit your own questions' });
+    }
+
+    thread.title = title.trim();
+    thread.content = content.trim();
+    if (subject) thread.subject = subject;
+    thread.editedAt = new Date();
+
+    await thread.save();
+    return res.json(thread);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // 12. Delete Forum Thread
 router.delete('/forum/:id', async (req, res) => {
   const { id } = req.params;
@@ -478,10 +628,7 @@ router.delete('/forum/:id', async (req, res) => {
     const thread = await DoubtForum.findById(id);
     if (!thread) return res.status(404).json({ error: 'Thread not found' });
 
-    // Threads created before ownerId existed fall back to the display name, which
-    // is the only owner record they have.
-    const isOwner = thread.ownerId ? thread.ownerId === userId : thread.askedBy === username;
-    if (!isOwner) {
+    if (!ownsRecord(thread, userId, username, 'askedBy')) {
       return res.status(403).json({ error: 'You can only delete your own threads' });
     }
 
@@ -526,6 +673,38 @@ router.post('/notes', async (req, res) => {
   }
 });
 
+// 14b. Edit your own shared note
+router.put('/notes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId, username } = identityOf(req);
+  const { title, subject, description, link } = req.body;
+
+  if (!title || !title.trim() || !subject) {
+    return res.status(400).json({ error: 'Title and subject are required' });
+  }
+
+  try {
+    const note = await SharedNote.findById(id);
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+    if (!ownsRecord(note, userId, username, 'author')) {
+      return res.status(403).json({ error: 'You can only edit your own notes' });
+    }
+
+    note.title = title.trim();
+    note.subject = subject;
+    note.description = description || '';
+    note.link = link || '';
+    // The image is left alone: replacing it is an upload, which goes through
+    // the create form rather than this inline edit.
+    note.editedAt = new Date();
+
+    await note.save();
+    return res.json(note);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // 15. Delete shared note
 router.delete('/notes/:id', async (req, res) => {
   const { id } = req.params;
@@ -534,8 +713,7 @@ router.delete('/notes/:id', async (req, res) => {
     const note = await SharedNote.findById(id);
     if (!note) return res.status(404).json({ error: 'Note not found' });
 
-    const isOwner = note.ownerId ? note.ownerId === userId : note.author === username;
-    if (!isOwner) {
+    if (!ownsRecord(note, userId, username, 'author')) {
       return res.status(403).json({ error: 'You can only delete your own notes' });
     }
 
@@ -558,15 +736,60 @@ router.get('/studyroom/messages', async (req, res) => {
 
 // 17. Post a study room message
 router.post('/studyroom/messages', async (req, res) => {
-  const { username } = identityOf(req);
+  const { userId, username } = identityOf(req);
   const { text } = req.body;
   try {
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
     }
-    const message = new StudyRoomMessage({ sender: username, text });
+    const message = new StudyRoomMessage({ sender: username, text, ownerId: userId });
     await message.save();
     return res.json(message);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 17b. Edit your own study room message
+router.put('/studyroom/messages/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId, username } = identityOf(req);
+  const { text } = req.body;
+
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'Text is required' });
+  }
+
+  try {
+    const message = await StudyRoomMessage.findById(id);
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+    if (!ownsRecord(message, userId, username, 'sender')) {
+      return res.status(403).json({ error: 'You can only edit your own messages' });
+    }
+
+    message.text = text.trim();
+    message.editedAt = new Date();
+    await message.save();
+    return res.json(message);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 17c. Delete your own study room message
+router.delete('/studyroom/messages/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId, username } = identityOf(req);
+
+  try {
+    const message = await StudyRoomMessage.findById(id);
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+    if (!ownsRecord(message, userId, username, 'sender')) {
+      return res.status(403).json({ error: 'You can only delete your own messages' });
+    }
+
+    await message.deleteOne();
+    return res.json({ message: 'Message deleted' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -619,6 +842,60 @@ router.get('/studyroom/users', async (req, res) => {
   }
 });
 
+
+// 19b. Read the shared room timer
+router.get('/studyroom/timer', async (req, res) => {
+  try {
+    let state = projectTimer(await readTimer());
+    // The session ran out while nobody was looking: park it at a full session
+    // so the next student starts cleanly.
+    if (state.running && state.remaining === 0) {
+      state = await writeTimer({
+        ...state, running: false, endsAt: null, remaining: state.duration
+      });
+    }
+    return res.json(publicTimer(state));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 19c. Start, pause or reset the shared room timer
+router.post('/studyroom/timer', async (req, res) => {
+  const { username } = identityOf(req);
+  const { action, duration } = req.body;
+
+  if (!['start', 'pause', 'reset'].includes(action)) {
+    return res.status(400).json({ error: "action must be 'start', 'pause' or 'reset'" });
+  }
+
+  try {
+    const current = projectTimer(await readTimer());
+    let next;
+
+    if (action === 'start') {
+      // Resuming picks up where the room left off; a finished session restarts.
+      const remaining = current.remaining > 0 ? current.remaining : current.duration;
+      next = { ...current, running: true, endsAt: Date.now() + remaining * 1000, remaining };
+    } else if (action === 'pause') {
+      next = { ...current, running: false, endsAt: null, remaining: current.remaining };
+    } else {
+      const asked = Number(duration);
+      const d = Number.isFinite(asked) && asked > 0
+        ? Math.min(Math.round(asked), MAX_SESSION_SECONDS)
+        : current.duration;
+      next = { running: false, duration: d, endsAt: null, remaining: d };
+    }
+
+    next.updatedBy = username;
+    next.updatedAt = Date.now();
+    await writeTimer(next);
+
+    return res.json(publicTimer(projectTimer(next)));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 // 19. Get all chat sessions for a student (most recent first)
 router.get('/chat-sessions', async (req, res) => {

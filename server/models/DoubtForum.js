@@ -32,8 +32,16 @@ const DoubtForumSchema = new mongoose.Schema({
     content: { type: String, required: true },
     isAI: { type: Boolean, default: false },
     upvotes: { type: Number, default: 0 },
+    // Set from the authenticated user on create; used to authorise edit/delete.
+    // Empty on answers posted before this field existed.
+    ownerId: { type: String, default: '' },
+    editedAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now }
   }],
+  editedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

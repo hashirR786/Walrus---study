@@ -119,6 +119,14 @@ export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [accent, setAccent] = useState(localStorage.getItem('accent') || 'classic-slate');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [examLocked, setExamLocked] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar_collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [mobileHeaderHidden, setMobileHeaderHidden] = useState(false);
   
   const [progressData, setProgressData] = useState(null);
@@ -146,6 +154,17 @@ export default function App() {
     setMobileHeaderHidden(false);
   }, [activeTab]);
 
+  // While a strict exam is running the shell is pinned to the Practice Engine.
+  // Every navigation path goes through here, so the sidebar, the tutorial cards
+  // and anything added later are all covered by the one guard.
+  const requestTab = (tab) => {
+    if (examLocked && tab !== 'practice-engine') {
+      addToast('Submit or quit your exam before leaving this page.', 'warning');
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   // Toast utility
   const addToast = (msg, type = 'success') => {
     const id = Date.now();
@@ -165,6 +184,13 @@ export default function App() {
     document.documentElement.setAttribute('data-accent', accent);
     localStorage.setItem('accent', accent);
   }, [accent]);
+
+  // Remember the rail between visits, like the theme and accent.
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_collapsed', sidebarCollapsed ? '1' : '0');
+    } catch { /* storage unavailable */ }
+  }, [sidebarCollapsed]);
 
   // Load profile data on start or when user changes
   useEffect(() => {
@@ -446,10 +472,16 @@ export default function App() {
   }
 
   return (
-    <div className={`app-container ${mobileHeaderHidden ? 'mobile-header-hidden' : ''}`}>
+    <div className={`app-container ${mobileHeaderHidden ? 'mobile-header-hidden' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Mobile Top Header */}
       <header className="mobile-header">
-        <button className="menu-toggle-btn" onClick={() => setIsSidebarOpen(true)}>
+        <button
+          className="menu-toggle-btn"
+          onClick={() => setIsSidebarOpen(true)}
+          disabled={examLocked}
+          title={examLocked ? 'Locked during your exam' : 'Open menu'}
+          style={examLocked ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+        >
           <Menu size={24} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -466,7 +498,10 @@ export default function App() {
 
       <Sidebar 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={requestTab}
+        examLocked={examLocked}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(v => !v)}
         theme={theme} 
         setTheme={setTheme} 
         accent={accent} 
@@ -488,7 +523,7 @@ export default function App() {
         <div className="page-transition" style={{ height: activeTab === 'doubt-solver' ? '100%' : 'auto', display: 'flex', flexDirection: 'column' }}>
 
           <div style={{ display: activeTab === 'tutorial' ? 'block' : 'none' }}>
-            <Tutorial setActiveTab={setActiveTab} user={user} />
+            <Tutorial setActiveTab={requestTab} user={user} />
           </div>
 
           <div style={{ display: activeTab === 'doubt-solver' ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0, overflow: 'hidden' }}>
@@ -524,6 +559,7 @@ export default function App() {
               onSaveTestResult={handleSaveTestResult}
               user={user}
               activeTab={activeTab}
+              onExamLockChange={setExamLocked}
             />
           </div>
           

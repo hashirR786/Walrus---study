@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User as UserIcon, Sparkles, RefreshCw } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, LoaderCircle } from 'lucide-react';
 import { API_BASE } from '../config';
 
 
@@ -156,14 +156,12 @@ export default function Auth({ onAuthSuccess, addToast }) {
             type="submit" 
             className="auth-submit-btn" 
             disabled={loading}
+            aria-busy={loading}
           >
             {loading ? (
-              <RefreshCw className="animate-spin" size={18} />
+              <LoaderCircle className="animate-spin" size={18} />
             ) : (
-              <>
-                <Sparkles size={16} />
-                <span>{isLogin ? 'Sign In to Dashboard' : 'Create Account'}</span>
-              </>
+              <span>{isLogin ? 'Sign In to Dashboard' : 'Create Account'}</span>
             )}
           </button>
         </form>

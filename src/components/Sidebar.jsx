@@ -11,7 +11,10 @@ import {
   GraduationCap,
   LogOut,
   X,
-  HelpCircle
+  HelpCircle,
+  Lock,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 
 
@@ -35,7 +38,10 @@ export default function Sidebar({
   user,
   onLogout,
   isOpen,
-  onClose
+  onClose,
+  examLocked = false,
+  collapsed = false,
+  onToggleCollapse
 }) {
   const menuItems = [
     { id: 'tutorial', label: 'Quick Start Tour', icon: HelpCircle },
@@ -69,7 +75,7 @@ export default function Sidebar({
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       {/* Brand Logo Header */}
       <div className="brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '2.5rem', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -86,7 +92,7 @@ export default function Sidebar({
               border: '1px solid var(--border-color)'
             }} 
           />
-          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+          <div className="brand-text" style={{ display: collapsed ? 'none' : 'flex', flexDirection: 'column', textAlign: 'left' }}>
             <span style={{ fontSize: '1.45rem', fontWeight: '700', color: 'var(--text-primary)', fontFamily: 'var(--font-heading)', lineHeight: '1' }}>
               Walrus
             </span>
@@ -95,6 +101,17 @@ export default function Sidebar({
             </span>
           </div>
         </div>
+        {onToggleCollapse && (
+          <button
+            className="sidebar-collapse-btn"
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          </button>
+        )}
         <button 
           className="mobile-close-btn" 
           onClick={onClose} 
@@ -118,7 +135,18 @@ export default function Sidebar({
         </div>
       )}
 
-      <div className="nav-menu">
+      {examLocked && (
+        <div className="exam-lock-note">
+          <Lock size={13} />
+          <span>Exam in progress &mdash; navigation is locked until you submit or quit.</span>
+        </div>
+      )}
+
+      <div
+        className="nav-menu"
+        aria-hidden={examLocked}
+        style={examLocked ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+      >
         <div className="nav-group-header">Learning Core</div>
         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           {menuItems.filter(item => ['doubt-solver', 'syllabus-tracker', 'practice-engine'].includes(item.id)).map((item) => {
@@ -127,6 +155,7 @@ export default function Sidebar({
               <li key={item.id}>
                 <a 
                   className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  title={item.label}
                   onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
                 >
                   <IconComponent size={18} />
@@ -145,6 +174,7 @@ export default function Sidebar({
               <li key={item.id}>
                 <a 
                   className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  title={item.label}
                   onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
                 >
                   <IconComponent size={18} />
@@ -163,6 +193,7 @@ export default function Sidebar({
               <li key={item.id}>
                 <a 
                   className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  title={item.label}
                   onClick={() => { setActiveTab(item.id); if (onClose) onClose(); }}
                 >
                   <IconComponent size={18} />
@@ -178,7 +209,7 @@ export default function Sidebar({
         {/* Logged in User Profile Node */}
         {user && (
           <div 
-            onClick={() => { setActiveTab('profile'); if (onClose) onClose(); }}
+            onClick={() => { if (examLocked) return; setActiveTab('profile'); if (onClose) onClose(); }}
             style={{ 
               display: 'flex', 
               alignItems: 'center',
@@ -214,7 +245,7 @@ export default function Sidebar({
                 <span>{(user.username || 'W').charAt(0).toUpperCase()}</span>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', textAlign: 'left', minWidth: 0, flex: 1 }}>
+            <div style={{ display: collapsed ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden', textAlign: 'left', minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem', width: '100%', overflow: 'hidden' }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {user.username}

@@ -87,7 +87,7 @@ const QUESTION_TYPES = [
   { key: 'LA',    label: 'Long Answer',         desc: '5-mark questions — full derivations, two-part questions' },
 ];
 
-export default function PracticeEngine({ progressData, onSaveTestResult, user, activeTab }) {
+export default function PracticeEngine({ progressData, onSaveTestResult, user, activeTab, onExamLockChange }) {
   const activeSubjects = progressData?.subjectProgress?.map(s => s.subjectName) || SUBJECTS;
   // Load cached active test state from localStorage if available
   const [activeTestCache] = useState(() => {
@@ -296,6 +296,19 @@ export default function PracticeEngine({ progressData, onSaveTestResult, user, a
       });
     }
   };
+
+  // Tell the app shell to lock navigation while a strict exam is running.
+  // Moving to another page inside the app fires no blur, visibilitychange or
+  // fullscreenchange event, so without this a student could simply click
+  // "AI Doubt Solver" in the sidebar: no violation recorded, exam still ticking
+  // away in a hidden div. That was a complete bypass of strict mode.
+  useEffect(() => {
+    const locked = !!(testActive && strictMode);
+    if (onExamLockChange) onExamLockChange(locked);
+    return () => {
+      if (onExamLockChange) onExamLockChange(false);
+    };
+  }, [testActive, strictMode, onExamLockChange]);
 
   // Strict mode event listeners.
   // Re-registers only when testActive or strictMode change — NOT when violationWarning

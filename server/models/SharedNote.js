@@ -31,6 +31,10 @@ const SharedNoteSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  editedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
