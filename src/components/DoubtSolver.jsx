@@ -627,8 +627,14 @@ export default function DoubtSolver({ progressData, onActivityTriggered, user, a
           bottom: 0, 
           left: 0, 
           right: 0, 
-          padding: '0.5rem 1.5rem 1.5rem', 
-          backgroundColor: 'transparent', 
+          // Taller than it needs to be so the fade below has room to work.
+          padding: '2.75rem 1.5rem 1.5rem',
+          // The composer floats over a transcript that scrolls the full height
+          // behind it. Fully transparent, the text ran straight through and past
+          // it, which at short window heights read as the chat being clipped off
+          // at the bottom. Fading into the page colour hides the overlap while
+          // keeping the floating look.
+          background: 'linear-gradient(to bottom, transparent 0%, var(--bg-app) 45%)',
           borderTop: 'none', 
           zIndex: 10,
           pointerEvents: 'none' 
