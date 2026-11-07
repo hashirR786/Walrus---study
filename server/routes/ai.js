@@ -60,18 +60,47 @@ Use this full structure:
 - Off-topic questions: politely decline and redirect to academics.
 - Always ground answers in NCERT first.`;
 
+// ── Model ids ────────────────────────────────────────────────────────────────
+// Kept together so a provider rename is a one-line change rather than a hunt
+// through the file. These do get renamed: qwen3.6-27b, used here as the primary
+// chat model, was answering 404 "model does not exist" and every tutor request
+// was silently falling through to the Gemini fallback.
+// Check against https://api.groq.com/openai/v1/models and the Gemini
+// /v1beta/models listing before changing them.
+const GROQ_CHAT_MODEL = 'qwen/qwen3.8-27b';   // conversational tutor answers
+const GROQ_JSON_MODEL = 'openai/gpt-oss-20b'; // structured generation
+const GEMINI_MODEL = 'gemini-2.5-flash';      // fallback
+
+// Flash-lite models do no thinking and reject thinkingConfig with
+// "invalid argument", so this flag travels with GEMINI_MODEL above.
+const GEMINI_ACCEPTS_THINKING_CONFIG = true;
+
+// Groq rejects unknown payload properties outright: `thinking: false` was
+// answering 400 "property 'thinking' is unsupported", which with the 404 above
+// meant the primary chat path could never succeed. reasoning_effort is the
+// supported spelling, and on qwen3.8-27b it measured 1201ms / 548 tokens
+// against 2444ms / 735 with reasoning left on. Also travels with the model.
+const GROQ_CHAT_REASONING_EFFORT = 'none';
+
 // Utility to contact Groq API via Fetch
 async function callGroqAPI(messages, temperature = 0.2, responseFormat = null, maxTokens = null) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
 
-  const model = 'openai/gpt-oss-20b';
+  const model = GROQ_JSON_MODEL;
   const payload = { model, messages, temperature };
   if (responseFormat) payload.response_format = responseFormat;
 
   // Conditionally configure reasoning options to avoid 400 Bad Request on standard models
   if (model.startsWith('openai/gpt-oss') || model.includes('deepseek')) {
     payload.reasoning_format = 'parsed';
+    // gpt-oss is a reasoning model and spends the token budget thinking before it
+    // writes. On a 15-question JSON paper that was running to 1872 completion
+    // tokens and intermittently truncating, which Groq rejects as
+    // "Failed to validate JSON". At low effort the same paper comes back in 731
+    // tokens and 2.6x faster. Note gpt-oss only accepts low|medium|high -- 'none'
+    // is a 400.
+    payload.reasoning_effort = 'low';
     payload.max_tokens = maxTokens || 4000;
   } else {
     payload.max_tokens = maxTokens || 4000;
@@ -91,19 +120,20 @@ async function callGroqAPI(messages, temperature = 0.2, responseFormat = null, m
   return stripThinkTags(data.choices[0].message.content);
 }
 
-// Groq chat/doubt-solver — PRIMARY model: qwen/qwen3.6-27b
+// Groq chat/doubt-solver — PRIMARY model, see GROQ_CHAT_MODEL above
 // Recommended Groq replacement for llama-3.3-70b-versatile (deprecated Aug 16, 2026)
 async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not defined');
 
   const payload = {
-    model: 'qwen/qwen3.6-27b',
+    model: GROQ_CHAT_MODEL,
     messages,
     temperature,
     max_tokens: maxTokens,
-    // Disable Qwen's chain-of-thought mode — we strip <think> tags as backup too
-    thinking: false,
+    // Keep the model from spending the budget on a hidden reasoning pass.
+    // stripThinkTags() below is still the backstop if any leaks through.
+    reasoning_effort: GROQ_CHAT_REASONING_EFFORT,
   };
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -114,7 +144,16 @@ async function callGroqChatAPI(messages, temperature = 0.3, maxTokens = 4096) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `Groq Chat API status ${response.status}`);
+    const detail = errorData.error?.message || `Groq Chat API status ${response.status}`;
+    if (response.status === 400 || response.status === 404) {
+      // Not a transient failure: the model id or the payload is wrong, and every
+      // request will keep falling through to the fallback until it is fixed.
+      console.error(
+        `MISCONFIGURED: Groq rejected the chat request (${response.status}) with "${detail}". ` +
+        `Model is "${GROQ_CHAT_MODEL}". Check https://api.groq.com/openai/v1/models.`
+      );
+    }
+    throw new Error(detail);
   }
   const data = await response.json();
   return stripThinkTags(data.choices[0].message.content);
@@ -151,6 +190,11 @@ async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temper
     generationConfig: {
       temperature,
       maxOutputTokens: 8192,
+      // Measured on this exact prompt: thinking on spent 689 of 964 tokens on
+      // the hidden pass and took 5.5s; off, the same question cost 333 tokens
+      // in 2.4s and the answer was slightly longer. Step-by-step CBSE working
+      // is the reasoning, so there is nothing to gain from a second private one.
+      ...(GEMINI_ACCEPTS_THINKING_CONFIG ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
     }
   };
 
@@ -162,7 +206,7 @@ async function callGeminiAPI(systemPrompt, chatHistory = [], userMessage, temper
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal }
     );
 
@@ -210,7 +254,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
     console.error('RedVER read error for /solve:', err);
   }
 
-  // ── PRIMARY: Groq — qwen/qwen3.6-27b (fast, available on free tier) ─────────────
+  // ── PRIMARY: Groq (fast, free tier) ───────────────────────────────────────
   try {
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -218,8 +262,8 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       { role: 'user', content: userPrompt }
     ];
     const reply = await callGroqChatAPI(messages, 0.3, 4096);
-    console.log('✅ Groq answered successfully (qwen/qwen3.6-27b)');
-    const successResponse = { response: reply, model: 'groq-qwen-27b' };
+    console.log(`✅ Groq answered successfully (${GROQ_CHAT_MODEL})`);
+    const successResponse = { response: reply, model: GROQ_CHAT_MODEL };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
@@ -239,7 +283,7 @@ ${studentAttempt ? `[STUDENT_ATTEMPT]: ${studentAttempt}` : ''}
       0.2
     );
     console.log('✅ Gemini fallback answered successfully');
-    const successResponse = { response: reply, model: 'gemini-2.5-flash' };
+    const successResponse = { response: reply, model: GEMINI_MODEL };
     try {
       await safeCache.set(cacheKey, JSON.stringify(successResponse), { EX: 86400 });
     } catch (e) {
@@ -1079,4 +1123,9 @@ router.post('/generate-flashcards', async (req, res) => {
 });
 
 export default router;
+
+// Shared with the quiz routes so the LLM plumbing and the model ids live in one
+// place. Both of today's model bugs came from a model id duplicated in a second
+// spot and left behind.
+export { callGroqAPI, GROQ_JSON_MODEL };
 
