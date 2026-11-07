@@ -5,6 +5,7 @@ import { connectDB } from './config/db.js';
 import { connectCache } from './config/cache.js';
 import aiRouter from './routes/ai.js';
 import studentRouter from './routes/student.js';
+import quizRouter from './routes/quiz.js';
 import authRoutes from './routes/authRoutes.js';
 
 import path from 'path';
@@ -80,6 +81,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Routes
 app.use('/api/ai', aiRouter);
 app.use('/api/student', studentRouter);
+app.use('/api/quiz', quizRouter);
 app.use('/api/auth', authRoutes);
 
 // Health Check

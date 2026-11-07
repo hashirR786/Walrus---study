@@ -11,6 +11,7 @@ import Community from './components/Community';
 import Auth from './components/Auth';
 import ProfileView from './components/ProfileView';
 import Tutorial from './components/Tutorial';
+import DailyQuiz from './components/DailyQuiz';
 import StreamSetup from './components/StreamSetup';
 import { apiFetch, setUnauthorizedHandler } from './api';
 
@@ -158,7 +159,10 @@ export default function App() {
   // Every navigation path goes through here, so the sidebar, the tutorial cards
   // and anything added later are all covered by the one guard.
   const requestTab = (tab) => {
-    if (examLocked && tab !== 'practice-engine') {
+    // Pinned to whichever page is running the exam -- the Practice Engine and the
+    // Daily Quiz both raise this lock, so compare against the current tab rather
+    // than naming one of them.
+    if (examLocked && tab !== activeTab) {
       addToast('Submit or quit your exam before leaving this page.', 'warning');
       return;
     }
@@ -563,6 +567,13 @@ export default function App() {
             />
           </div>
           
+          <div style={{ display: activeTab === 'daily-quiz' ? 'block' : 'none' }}>
+            <DailyQuiz
+              user={user}
+              onExamLockChange={setExamLocked}
+            />
+          </div>
+
           <div style={{ display: activeTab === 'analytics' ? 'block' : 'none' }}>
             <Analytics progressData={filteredProgressData} />
           </div>

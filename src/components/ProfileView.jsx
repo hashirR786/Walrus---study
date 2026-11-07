@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { User as UserIcon, Camera, Trophy, Sparkles, CheckSquare, Target, Settings, Flame, Loader2 } from 'lucide-react';
-import { apiFetch } from '../api';
+import { User as UserIcon, Camera, Trophy, Sparkles, CheckSquare, Target, Settings, Flame, Loader2, Crown } from 'lucide-react';
+import { apiFetch, apiJson } from '../api';
 
 const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -12,6 +12,12 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
   const [saving, setSaving] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [badges, setBadges] = useState([]);
+
+  // Weekly Daily Quiz badges. Decoration, so a failure here never blocks the page.
+  React.useEffect(() => {
+    apiJson('/quiz/badges').then(setBadges).catch(() => setBadges([]));
+  }, []);
 
   // Fetch tasks on render for statistics
   React.useEffect(() => {
@@ -206,6 +212,41 @@ const ProfileView = ({ token, user, onUpdateUser, addToast }) => {
                 {currentStreak > 0 ? 'Conscious streak active! Keep going!' : 'Complete a task today to start your streak!'}
               </div>
             </div>
+          </div>
+
+          {/* Weekly Daily Quiz badges */}
+          <div style={{ width: '100%', marginTop: '1rem', textAlign: 'left' }}>
+            <div style={{
+              fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.06em',
+              textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem',
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+            }}>
+              <Crown size={13} style={{ color: 'var(--warning)' }} /> Weekly Topper Badges
+            </div>
+            {badges.length === 0 ? (
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>
+                Top the Daily Quiz leaderboard for a week to earn one.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {badges.map((b) => (
+                  <div key={b._id} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--warning)', backgroundColor: 'rgba(217,159,89,0.12)',
+                  }}>
+                    <Crown size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.78rem' }}>{b.track} Topper</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{b.label}</div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        {b.totalScore} marks over {b.quizzesTaken} {b.quizzesTaken === 1 ? 'quiz' : 'quizzes'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

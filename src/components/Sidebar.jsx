@@ -13,6 +13,7 @@ import {
   X,
   HelpCircle,
   Lock,
+  Trophy,
   ChevronsLeft,
   ChevronsRight
 } from 'lucide-react';
@@ -48,6 +49,7 @@ export default function Sidebar({
     { id: 'doubt-solver', label: 'AI Doubt Solver', icon: MessageSquare },
     { id: 'syllabus-tracker', label: 'Syllabus Tracker', icon: CheckSquare },
     { id: 'practice-engine', label: 'Practice Engine', icon: GraduationCap },
+    { id: 'daily-quiz', label: 'Daily Quiz', icon: Trophy },
     { id: 'analytics', label: 'Analytics Dashboard', icon: Activity },
     { id: 'planner', label: 'Planner & productivity', icon: Calendar },
     { id: 'community', label: 'Community Hub', icon: Users }
@@ -149,7 +151,7 @@ export default function Sidebar({
       >
         <div className="nav-group-header">Learning Core</div>
         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          {menuItems.filter(item => ['doubt-solver', 'syllabus-tracker', 'practice-engine'].includes(item.id)).map((item) => {
+          {menuItems.filter(item => ['doubt-solver', 'syllabus-tracker', 'practice-engine', 'daily-quiz'].includes(item.id)).map((item) => {
             const IconComponent = item.icon;
             return (
               <li key={item.id}>
